@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/backend",
+    "crates/frontend",
+    "crates/tauri",
+    "crates/types",
+    "plugins/tasks"
+]
