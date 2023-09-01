@@ -10,6 +10,6 @@ anyhow = "1"
 serde = "1"
 solvent = "0.8.3"
 hirola = { version = "0.3.1", features = ["ssr", "serde"] }
-plugy = { path = "../../../plugy"  }
+plugy = { version = "0.2.1"  }
 serde_json = "1"
 serde-error = "0.1.2"

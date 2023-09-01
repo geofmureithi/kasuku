@@ -11,8 +11,7 @@ tower-http = { version = "0.4", features = ["cors"] }
 tokio = { version = "1.0", features = ["full"] }
 serde = "1"
 types = { path = "../types" }
-kasuku-tasks = { path = "../../plugins/tasks" }
-plugy = { path = "../../../plugy", default-features = false, features = [
+plugy = { version = "0.2.1", default-features = false, features = [
     "runtime",
     "macros",
 ] }

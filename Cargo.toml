@@ -6,3 +6,7 @@ members = [
     "crates/types",
     "plugins/tasks"
 ]
+
+[profile.release]
+lto = true
+opt-level = 's'

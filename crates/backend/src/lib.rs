@@ -1,15 +1,13 @@
 use std::{net::SocketAddr, ops::Deref, sync::Arc};
 
 use axum::{
-    extract::{
-        Path,
-    },
+    extract::Path,
     http::Method,
     response::{Html, IntoResponse},
     routing::{get, post},
     Extension, Json, Router,
 };
-use plugy::{runtime::Runtime};
+use plugy::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 
 use types::{Config, FileEvent, Plugin, RenderEvent, UserInfo};
@@ -48,10 +46,12 @@ impl KasukuRuntime {
 pub async fn app<D: Send + Sync + Clone + 'static>(port: u16, data: D) {
     let app = Router::new()
         .route("/user", get(user_handler))
-        .route("/config", get(get_config))
-        .route("/api/v1/:namespace/:plugin/*path", get(getter))
+        .route("/api/v1/config", get(get_config))
+        .route(
+            "/api/v1/:namespace/:plugin/*path",
+            get(getter).post(do_action),
+        )
         .route("/api/v1/:namespace/:plugin", get(getter))
-        .route("/api/v1/:namespace/:plugin/*path", post(do_action))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(vec![
             Method::GET,
             Method::POST,
@@ -88,10 +88,9 @@ async fn do_action(
     Html("res")
 }
 
-async fn get_config(state: Extension<KasukuRuntime>,) -> impl IntoResponse {
+async fn get_config(state: Extension<KasukuRuntime>) -> impl IntoResponse {
     Json(state.config.clone())
 }
-
 
 async fn user_handler() -> impl IntoResponse {
     let user = UserInfo {
