@@ -2779,6 +2779,8 @@ dependencies = [
 [[package]]
 name = "plugy"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5505108b577dd0158a5b383aa607ceac9d49847739cfc12892d2e880c106f9a7"
 dependencies = [
  "plugy-core",
  "plugy-macros",
@@ -2788,6 +2790,8 @@ dependencies = [
 [[package]]
 name = "plugy-core"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdf030b60d879bc4b2deb06977b388d08f96bb068623f111ec13c79376224e3d"
 dependencies = [
  "anyhow",
  "bincode",
@@ -2797,6 +2801,8 @@ dependencies = [
 [[package]]
 name = "plugy-macros"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9fb70b6a632e2d7a736188b9da3d2316ec97021eb126d3ace90ddb97d541562"
 dependencies = [
  "darling",
  "proc-macro2 1.0.66",
@@ -2807,6 +2813,8 @@ dependencies = [
 [[package]]
 name = "plugy-runtime"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c06b2d9079612b9b51dc19bd6fed0b4ae9b0a9db01f0089ff4f50fa9eefeb902"
 dependencies = [
  "anyhow",
  "async-lock",
