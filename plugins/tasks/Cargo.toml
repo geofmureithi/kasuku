@@ -13,3 +13,5 @@ plugy = { path = "../../../plugy"  }
 types = { path = "../../crates/types" }
 serde = { version = "1", features = ["derive"] }
 hirola = { version = "0.3.1", features = ["ssr", "serde"] }
+serde_json = "1"
+serde_prefix = "0.1.0"

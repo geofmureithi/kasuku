@@ -1,6 +1,6 @@
 # Kasuku - Your All-in-One Personal Management System
 
-Kasuku is a cutting-edge all-in-one personal management system powered by WebAssembly (Wasm) technology. This innovative platform empowers you to efficiently organize various aspects of your life, thanks to the flexibility and performance of Wasm-based plugins.
+Kasuku is a cutting-edge all-in-one personal management system powered by WebAssembly technology. This innovative platform empowers you to efficiently organize various aspects of your life, thanks to the flexibility and performance of Wasm-based plugins.
 
 <!-- ![Kasuku Screenshot](screenshot.png) -->
 

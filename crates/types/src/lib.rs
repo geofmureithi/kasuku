@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future, pin::Pin};
+use std::{collections::HashMap, future::Future, pin::Pin, fmt::Display};
 
 use plugy::core::PluginLoader;
 use serde::{Deserialize, Serialize};
@@ -117,4 +117,23 @@ pub trait Plugin: Send + Sync {
     fn handle(&self, msg: FileEvent) -> Result<bool, HandleError>;
     /// Return a rendered html version
     fn render(&self, evt: RenderEvent) -> String;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Emit<Ev> {
+    data: Ev,
+    r#type: String,
+}
+
+impl<Ev: Serialize> Display for Emit<Ev> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "emit({})", serde_json::to_string(&self).unwrap())
+    }
+}
+
+pub fn emit<Ev>(data: &Ev) -> Emit<&Ev> {
+    Emit {
+        data,
+        r#type: std::any::type_name::<Ev>().to_owned(),
+    }
 }
