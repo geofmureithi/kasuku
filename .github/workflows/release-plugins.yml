@@ -80,7 +80,7 @@ jobs:
         echo Pushing policy to OCI container registry
         IMMUTABLE_REF=$(wasm-to-oci push ${{ env.plugin-name }}.wasm ${{ env.oci-target }}:latest 2>&1 | grep Digest | awk {'print $4'} | sed -e 's/"//')
         echo Keyless signing of plugin using cosign
-        cosign sign ${{ env.oci-target }}@${IMMUTABLE_REF}
+        cosign sign --yes ${{ env.oci-target }}@${IMMUTABLE_REF}
     -
       name: Publish Wasm artifact to OCI registry with the version tag and 'latest'
       shell: bash
@@ -95,7 +95,7 @@ jobs:
         IMMUTABLE_REF=$(wasm-to-oci push ${{ env.plugin-name }}.wasm ${{ env.oci-target }}:${OCI_TAG} 2>&1 | grep Digest | awk {'print $4'} | sed -e 's/"//')
 
         echo Keyless signing of plugin using cosign
-        cosign sign ${{ env.oci-target }}@${IMMUTABLE_REF}
+        cosign sign --yes ${{ env.oci-target }}@${IMMUTABLE_REF}
     -
       name: Create Release
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
