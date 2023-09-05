@@ -1,16 +1,20 @@
-use std::{net::SocketAddr, ops::Deref, sync::Arc};
-
 use axum::{
     extract::Path,
     http::Method,
     response::{Html, IntoResponse},
-    routing::{get, post},
+    routing::get,
     Extension, Json, Router,
 };
-use plugy::runtime::Runtime;
+use oci_distribution::{manifest::{self, OciManifest}, secrets::RegistryAuth, Client, Reference};
+use plugy::{core::PluginLoader, runtime::Runtime};
+use std::future::Future;
+use std::pin::Pin;
+use std::{net::SocketAddr, ops::Deref, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
-
-use types::{Config, FileEvent, Plugin, RenderEvent, UserInfo};
+use types::{
+    config::{Config, PluginConfig},
+    FileEvent, Plugin, RenderEvent, UserInfo,
+};
 
 pub type BoxedPlugin = Box<dyn Plugin>;
 
@@ -34,13 +38,73 @@ impl KasukuRuntime {
     pub async fn new(config: Config) -> Self {
         let runtime = Arc::new(Runtime::new().unwrap());
         for plugin in &config.plugins {
-            runtime.load(plugin.clone()).await.unwrap();
+            runtime
+                .load(BackendPlugin {
+                    inner: plugin.clone(),
+                })
+                .await
+                .unwrap();
         }
         KasukuRuntime {
             inner: runtime,
             config,
         }
     }
+}
+
+pub struct BackendPlugin {
+    inner: PluginConfig,
+}
+
+#[allow(dead_code)]
+pub struct PluginLock {
+    uri: String,
+    digest: String,
+    manifest: OciManifest,
+    version: String,
+}
+
+impl PluginLoader for BackendPlugin {
+    fn name(&self) -> &'static str {
+        Box::leak((self.inner.name.clone()).into_boxed_str())
+    }
+    fn load(&self) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, anyhow::Error>>>> {
+        let reference = self.inner.uri.clone();
+        std::boxed::Box::pin(async move {
+
+            // TODO: Make client reusable
+            let mut client = Client::new(oci_distribution::client::ClientConfig {
+                protocol: oci_distribution::client::ClientProtocol::Https,
+                ..Default::default()
+            });
+            let reference: Reference = reference.parse().expect("Not a valid image reference");
+            let (_manifest, _) = client
+                .pull_manifest(&reference, &RegistryAuth::Anonymous)
+                .await
+                .expect("Cannot pull manifest");
+            let wasm = pull_wasm(&mut client, &reference).await;
+            Ok(wasm)
+        })
+    }
+}
+
+// Read the Plugin
+async fn pull_wasm(client: &mut Client, reference: &Reference) -> Vec<u8> {
+    let image_content = client
+        .pull(
+            reference,
+            &RegistryAuth::Anonymous,
+            vec![manifest::WASM_LAYER_MEDIA_TYPE],
+        )
+        .await
+        .expect("Cannot pull Wasm module")
+        .layers
+        .into_iter()
+        .next()
+        .map(|layer| layer)
+        .expect("No data found");
+    println!("Annotations: {:?}", image_content.annotations);
+    image_content.data
 }
 
 pub async fn app<D: Send + Sync + Clone + 'static>(port: u16, data: D) {
@@ -84,7 +148,10 @@ async fn do_action(
     Json(data): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     let plugin = state.get_plugin_by_name(&plugin).unwrap();
-    let _res = plugin.handle(FileEvent::CustomAction(data)).await.unwrap();
+    let _res = plugin
+        .handle(FileEvent::CustomAction(serde_json::to_vec(&data).unwrap()))
+        .await
+        .unwrap();
     Html("res")
 }
 

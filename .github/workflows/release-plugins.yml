@@ -24,8 +24,8 @@ jobs:
       id-token: write
 
     env:
-      plugin-name: kasuku_tasks
-      oci-target: ghcr.io/${{ github.repository_owner }}/kasuku-plugins/tasks
+      plugin-name: tasks
+      oci-target: ghcr.io/${{ github.repository_owner }}/kasuku/@plugins/tasks
 
     steps:
     - uses: actions/checkout@v2
