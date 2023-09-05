@@ -59,7 +59,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: -p kasuku-tasks --target=wasm32-unknown-unknown --release
+        args: -p tasks --target=wasm32-unknown-unknown --release
     - run: mv target/wasm32-unknown-unknown/release/${{ env.plugin-name }}.wasm ${{ env.plugin-name }}.wasm
 
     -
