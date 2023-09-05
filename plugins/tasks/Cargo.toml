@@ -1,5 +1,5 @@
 [package]
-name = "kasuku-tasks"
+name = "tasks"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,5 +13,5 @@ plugy = { version = "0.2.1" }
 types = { path = "../../crates/types" }
 serde = { version = "1", features = ["derive"] }
 hirola = { version = "0.3.1", features = ["ssr", "serde"] }
-serde_json = "1"
+serde-json-wasm = "1.0.0"
 serde_prefix = "0.1.0"

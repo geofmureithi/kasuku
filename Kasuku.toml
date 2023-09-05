@@ -1,0 +1,26 @@
+[internals]
+cache-path = "./cache"
+
+[apps]
+planning = { plugins = ["tasks"], mount = "./Tasks" }
+# budget = { plugins = ["tasks", "finance", "schedule"], mount = "./Bills" }
+# entertainment = { plugins = ["files", "spotify", "audible"], mount = "./Media" }
+
+[plugins]
+tasks = { uri = "ghcr.io/geofmureithi/kasuku-plugins/tasks" }
+# notes = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/notes" }
+# fitness = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/fitness" }
+# finance = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/finance" }
+# files = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/files" }
+# schedule = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/schedule" }
+# growth = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/growth" }
+# password-manager = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/password-manager", headless = true }
+# encryption = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/password-manager", headless = true }
+
+[events]
+'cron::Daily' = [
+    "files::CleanUp",
+    "tasks::GenerateDaily",
+    "fitness::TrackDaily",
+]
+"tasks::TaskEvent::Delete" = ["growth::Cleanup"]
