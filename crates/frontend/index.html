@@ -5,23 +5,92 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Kasuku</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@unocss/reset/tailwind.min.css">
   <!-- define unocss options... -->
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-icons.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-wind.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-typography.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-web-fonts.global.js"></script>
   <script>
     window.__unocss = {
-      rules: [
-        // custom rules...
-      ],
       presets: [
-        // custom presets...
+        () => window.__unocss_runtime.presets.presetTypography(),
+        () => window.__unocss_runtime.presets.presetWind(),
+        () => window.__unocss_runtime.presets.presetIcons({
+          scale: 1.2,
+          cdn: 'https://esm.sh/'
+        }),
+        () => window.__unocss_runtime.presets.presetWebFonts({
+          provider: 'google', // default provider
+          fonts: {
+            // these will extend the default theme
+            sans: 'Roboto',
+            mono: ['Fira Code', 'Fira Mono:400,700'],
+            // custom ones
+            lobster: 'Lobster',
+            lato: [
+              {
+                name: 'Lato',
+                weights: ['400', '700'],
+                italic: true,
+              },
+              {
+                name: 'sans-serif',
+                provider: 'none',
+              },
+            ],
+          },
+        }),
       ],
-      // ...
-    }
+    };
   </script>
   <!-- ... and then load the runtime -->
-  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@unocss/reset/normalize.min.css">
-</head>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/core.global.js"></script>
 
-<body></body>
+</head>
+<style>
+  [un-cloak] {
+    display: none;
+    color: transparent;
+  }
+
+  .i-logo {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='100' width='100' viewBox='0 0 1800 1800'%3E%3Cpath d='M359.784 96.865c-34.336 0-62.27 27.934-62.27 62.27s27.934 62.27 62.27 62.27 62.27-27.934 62.27-62.27-27.934-62.27-62.27-62.27zm0 89.946h-.003c-15.259 0-27.673-12.415-27.673-27.676.006-15.263 12.421-27.676 27.676-27.676 15.26 0 27.676 12.415 27.676 27.676s-12.416 27.676-27.676 27.676z'/%3E%3Cpath d='M207.568 6.919v332.108c0 91.709 74.345 166.054 166.054 166.054H512V6.919H207.568zm152.216 256C302.557 262.919 256 216.362 256 159.135S302.557 55.351 359.784 55.351c57.226 0 103.784 46.557 103.784 103.784S417.01 262.919 359.784 262.919zM96.865 242.162c0 43.877 29.181 80.92 69.189 92.831v-92.831H96.865zM0 200.649h166.054V8.895C72.173 22.326 0 103.053 0 200.649z'/%3E%3C/svg%3E");
+  }
+
+  #loader {
+    animation: ripples 2s infinite;
+    height: 2rem;
+    width: 2rem;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+
+  @keyframes ripples {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+</style>
+
+<body>
+  <div id="loader" class="i-logo">
+    <div></div>
+    <div></div>
+  </div>
+  <div id="app" un-cloak>
+
+  </div>
+</body>
 
 </html>

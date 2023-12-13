@@ -861,6 +861,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "frontend"
+version = "0.1.0"
+dependencies = [
+ "gloo-file",
+ "hirola",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1056,6 +1067,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "gloo-events"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27c26fb45f7c385ba980f5fa87ac677e363949e065a083722697ef1b2cc91e41"
+dependencies = [
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "gloo-file"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97563d71863fb2824b2e974e754a81d19c4a7ec47b09ced8a0e6656b6d54bd1f"
+dependencies = [
+ "gloo-events",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "h2"
 version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1150,6 +1183,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e6276d410f1aa44ffb2f65162ca57b4fa88b6c69c2badd77bc0c0cc98f723a1"
 dependencies = [
  "hirola-core",
+ "hirola-dom",
  "hirola-macros",
 ]
 
@@ -1161,6 +1195,21 @@ checksum = "6eb3b00fcf3562897309d91c5a13c3a205fc5e3eaad653decf82a582121c8d1b"
 dependencies = [
  "futures-signals",
  "futures-util",
+]
+
+[[package]]
+name = "hirola-dom"
+version = "0.4.0-beta.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e2c5b214c40c5b174d333e55a35802730efeb1c501723049f33b418680af63a"
+dependencies = [
+ "discard",
+ "hirola-core",
+ "log",
+ "matchit",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
