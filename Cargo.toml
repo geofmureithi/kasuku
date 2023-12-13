@@ -1,12 +1,16 @@
 [workspace]
 members = [
     "crates/backend",
-    "crates/frontend",
-    "crates/tauri",
+    # "crates/frontend",
+    # "crates/tauri",
     "crates/types",
     "plugins/tasks"
 ]
+resolver = "2"
 
 [profile.release]
 lto = true
 opt-level = 's'
+
+[patch.crates-io]
+plugy = { path = "../plugy" }

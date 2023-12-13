@@ -16,3 +16,4 @@ async fn main() {
     let runtime = KasukuRuntime::new(config).await;
     let _app = backend::app(3001, runtime).await;
 }
+
