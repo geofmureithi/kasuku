@@ -12,5 +12,5 @@ resolver = "2"
 lto = true
 opt-level = 's'
 
-[patch.crates-io]
-plugy = { path = "../plugy" }
+# [patch.crates-io]
+# plugy = { path = "../plugy" }

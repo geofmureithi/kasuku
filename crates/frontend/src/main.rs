@@ -192,7 +192,7 @@ fn Nav() -> Dom {
     }
 }
 
-fn home(app: &App<()>) -> Dom {
+fn home(_: &App<()>) -> Dom {
     html! {
         <>
             <Nav />

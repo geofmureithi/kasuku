@@ -1928,7 +1928,9 @@ checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
 name = "plugy"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d80913173aff408419549b5afb351dc5a3be046774e9e524865cc0f7224d197e"
 dependencies = [
  "plugy-core",
  "plugy-macros",
@@ -1937,7 +1939,9 @@ dependencies = [
 
 [[package]]
 name = "plugy-core"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "835638cb2126626c14f8f4b8ce8f548921c56ede51134f50736d7eb3c918300d"
 dependencies = [
  "anyhow",
  "bincode",
@@ -1946,7 +1950,9 @@ dependencies = [
 
 [[package]]
 name = "plugy-macros"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9822b8eb7da013f18cdde15608ee766b0c14950546d3191a3f796881193835db"
 dependencies = [
  "convert_case",
  "darling",
@@ -1957,7 +1963,9 @@ dependencies = [
 
 [[package]]
 name = "plugy-runtime"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4277e630563df7dd8c99cca81c361d38c1b2d81c6ffd3086a4714aae81df7968"
 dependencies = [
  "anyhow",
  "async-lock",

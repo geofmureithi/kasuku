@@ -6,20 +6,16 @@ use node::Node;
 #[cfg(not(target_arch = "wasm32"))]
 use oci_distribution::Client;
 pub use pulldown_cmark::{Alignment, Event as PulldownEvent, HeadingLevel, LinkType};
-use serde::{
-    de::{DeserializeOwned, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::HashMap,
     fmt::{self},
     future::Future,
     marker::PhantomData,
     pin::Pin,
-    sync::Arc,
 };
 #[cfg(not(target_arch = "wasm32"))]
-use xtra::{Address, Handler};
+use xtra::Address;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -178,17 +174,17 @@ pub enum ViewType {
 #[derive(Default)]
 pub struct GlobalContext {
     listeners: HashMap<String, Vec<BackendPlugin>>,
-    views: HashMap<ViewType, String>,
-    plugins: HashMap<String, BackendPlugin>,
+    // views: HashMap<ViewType, String>,
+    // plugins: HashMap<String, BackendPlugin>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl GlobalContext {
     pub fn new() -> Self {
         GlobalContext {
-            plugins: HashMap::new(),
+            // plugins: HashMap::new(),
             listeners: HashMap::new(),
-            views: HashMap::new(),
+            // views: HashMap::new(),
         }
     }
 
@@ -201,7 +197,7 @@ impl GlobalContext {
             .push(plugin);
     }
 
-    pub fn remove_listener(&mut self, event: &Event, plugin: &BackendPlugin) {
+    pub fn remove_listener(&mut self, event: &Event, _plugin: &BackendPlugin) {
         if let Some(event_listeners) = self.listeners.get_mut(&event.path) {
             // event_listeners.retain(|p| p != plugin);
             // Optionally, remove the event entry from the hashmap if its listeners vector is empty.
@@ -218,7 +214,7 @@ pub struct Fetcher;
 #[plugy::macros::context(data = BackendPlugin)]
 impl Fetcher {
     pub async fn fetch(
-        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         url: String,
     ) -> String {
         url
@@ -231,7 +227,7 @@ pub struct Emitter;
 #[plugy::macros::context(data = BackendPlugin)]
 impl Emitter {
     pub async fn subscribe(
-        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         data: String,
     ) -> String {
         println!("{data}");
@@ -239,7 +235,7 @@ impl Emitter {
     }
 
     pub async fn emit(
-        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         url: String,
     ) -> String {
         url
@@ -287,8 +283,7 @@ impl<'de, 'a> Deserialize<'de> for &'a mut Context {
                 formatter.write_str("&mut Context")
             }
 
-            fn visit_unit<E>(self) -> Result<Self::Value, E>
-            {
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
                 Ok(Box::leak(Box::new(Context)))
             }
         }
@@ -310,8 +305,7 @@ impl<'de, 'a> Deserialize<'de> for &'a Context {
                 formatter.write_str("&Context")
             }
 
-            fn visit_unit<E>(self) -> Result<Self::Value, E>
-            {
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
                 Ok(Box::leak(Box::new(Context)))
             }
         }
@@ -322,7 +316,7 @@ impl<'de, 'a> Deserialize<'de> for &'a Context {
 pub struct Core;
 
 impl Plugin for Core {
-    fn on_load(&self, ctx: &mut Context) -> Result<(), Error> {
+    fn on_load(&self, _ctx: &mut Context) -> Result<(), Error> {
         unreachable!()
     }
 }
@@ -335,7 +329,7 @@ impl Context {
     pub fn fetch(&self, url: &str) -> String {
         fetcher::sync::Fetcher::fetch(url.to_string())
     }
-    pub fn register_view<W>(&mut self, view: ViewType, widget: W) {
+    pub fn register_view<W>(&mut self, _view: ViewType, _widget: W) {
         todo!()
     }
 
@@ -392,7 +386,7 @@ pub fn emit<Ev: Serialize + PluginEvent>(data: &Ev) -> CompactEvent {
 
 impl EventListener for Node {
     type Handler = CompactEvent;
-    fn event(&self, name: &str, handler: Self::Handler) {
+    fn event(&self, _name: &str, _handler: Self::Handler) {
         // self.event_handlers.borrow_mut().push(closure);
     }
 }
@@ -459,7 +453,7 @@ use oci_distribution::{
     Reference,
 };
 #[cfg(not(target_arch = "wasm32"))]
-use plugy::{core::PluginLoader, runtime::Runtime};
+use plugy::core::PluginLoader;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(dead_code)]

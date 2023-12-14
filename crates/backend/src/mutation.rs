@@ -10,7 +10,7 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
-    async fn command(&self, ctx: &Context<'_>, cmd: Command) -> i32 {
+    async fn command(&self, _ctx: &Context<'_>, _cmd: Command) -> i32 {
         // let mut books = ctx.data_unchecked::<Storage>().lock().await;
         // let entry = books.vacant_entry();
         // let id: ID = entry.key().into();
@@ -28,7 +28,7 @@ impl MutationRoot {
         // id
     }
 
-    async fn create_file(&self, ctx: &Context<'_>, path: String) -> Result<bool> {
+    async fn create_file(&self, _ctx: &Context<'_>, _path: String) -> Result<bool> {
         // let mut books = ctx.data_unchecked::<Storage>().lock().await;
         // let id = id.parse::<usize>()?;
         // if books.contains(id) {
@@ -44,7 +44,7 @@ impl MutationRoot {
         Ok(false)
     }
 
-    async fn update_file(&self, ctx: &Context<'_>, path: String) -> Result<bool> {
+    async fn update_file(&self, _ctx: &Context<'_>, _path: String) -> Result<bool> {
         // let mut books = ctx.data_unchecked::<Storage>().lock().await;
         // let id = id.parse::<usize>()?;
         // if books.contains(id) {
@@ -60,7 +60,7 @@ impl MutationRoot {
         Ok(false)
     }
 
-    async fn delete_file(&self, ctx: &Context<'_>, path: String) -> Result<bool> {
+    async fn delete_file(&self, _ctx: &Context<'_>, _path: String) -> Result<bool> {
         // let mut books = ctx.data_unchecked::<Storage>().lock().await;
         // let id = id.parse::<usize>()?;
         // if books.contains(id) {

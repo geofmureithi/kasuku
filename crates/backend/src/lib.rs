@@ -1,23 +1,20 @@
 mod mutation;
 pub mod query;
 
-use async_graphql::{http::GraphiQLSource, EmptyMutation, EmptySubscription, Schema};
+use async_graphql::{http::GraphiQLSource, EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
 use axum::{
-    extract::Path,
     http::Method,
     response::{Html, IntoResponse},
     routing::get,
     Extension, Json, Router,
 };
-use plugy::{core::PluginLoader, runtime::{Runtime, Context}};
-use std::future::Future;
-use std::pin::Pin;
+use plugy::runtime::Runtime;
+
 use std::{net::SocketAddr, ops::Deref, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 use types::{
-    config::{Config, PluginConfig},
-    Addr, BackendPlugin, Event, Fetcher, Plugin, UserInfo, PluginContext, GlobalContext, Emitter,
+    config::Config, BackendPlugin, Emitter, Fetcher, GlobalContext, Plugin, PluginContext, UserInfo,
 };
 use xtra::Mailbox;
 
@@ -48,18 +45,18 @@ impl KasukuRuntime {
         for plugin in &config.plugins {
             let plugin: types::PluginWrapper<BackendPlugin, _> = runtime
                 .load_with(BackendPlugin {
-                    addr: xtra::spawn_tokio(PluginContext {
-                        inner: GlobalContext::default()
-                    }, Mailbox::unbounded()),
+                    addr: xtra::spawn_tokio(
+                        PluginContext {
+                            inner: GlobalContext::default(),
+                        },
+                        Mailbox::unbounded(),
+                    ),
                     name: plugin.name.clone(),
                     uri: plugin.uri.clone(),
                 })
                 .await
                 .unwrap();
-            plugin
-                .on_load(::types::Context::acquire())
-                .await
-                .unwrap();
+            plugin.on_load(::types::Context::acquire()).await.unwrap();
         }
         KasukuRuntime {
             inner: Arc::new(runtime),

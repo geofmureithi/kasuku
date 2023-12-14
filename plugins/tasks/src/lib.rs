@@ -42,21 +42,21 @@ impl Plugin for Tasks {
         Ok(())
     }
 
-    fn process_file(&self, ctx: &Context, file: File) -> Result<File, Error> {
+    fn process_file(&self, _ctx: &Context, file: File) -> Result<File, Error> {
         match &file {
             File::Markdown(file) => {
-                let events: Vec<PulldownEvent<'_>> = file.get_contents();
+                let _events: Vec<PulldownEvent<'_>> = file.get_contents();
             },
             _ => todo!(),
         }
         Ok(file)
     }
 
-    fn on_event(&self, ctx: &Context, ev: Event) -> Result<(), Error> {
+    fn on_event(&self, _ctx: &Context, _ev: Event) -> Result<(), Error> {
         Ok(())
     }
 
-    fn render(&self, ctx: &Context, ev: Event) -> Result<Rsx, Error> {
+    fn render(&self, _ctx: &Context, _ev: Event) -> Result<Rsx, Error> {
         html! {
             <>
                 <task-card on:click=emit(&TaskEvent::Add)/>

@@ -1,4 +1,4 @@
-use plugy::runtime::Plugin;
+
 use ::types::{Event, Emit};
 use async_graphql::*;
 
@@ -45,7 +45,7 @@ pub struct RenderResult {
 
 #[Object]
 impl QueryRoot {
-    async fn render(&self, ctx: &Context<'_>, req: Render) -> serde_json::Value {
+    async fn render(&self, ctx: &Context<'_>, _req: Render) -> serde_json::Value {
         let runtime: &KasukuRuntime = ctx.data().unwrap();
         let plugin: ::types::PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name("tasks").unwrap();
         let res = plugin
