@@ -7,7 +7,7 @@ planning = { plugins = ["tasks"], mount = "./Tasks" }
 # entertainment = { plugins = ["files", "spotify", "audible"], mount = "./Media" }
 
 [plugins]
-tasks = { uri = "ghcr.io/geofmureithi/kasuku-plugins/tasks" }
+tasks = { uri = "localhost:5000/tasks:v8", config = "checkbox" }
 # notes = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/notes" }
 # fitness = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/fitness" }
 # finance = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/finance" }
@@ -16,6 +16,11 @@ tasks = { uri = "ghcr.io/geofmureithi/kasuku-plugins/tasks" }
 # growth = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/growth" }
 # password-manager = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/password-manager", headless = true }
 # encryption = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/password-manager", headless = true }
+
+
+[web-components]
+button = ""
+
 
 [events]
 'cron::Daily' = [

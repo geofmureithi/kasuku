@@ -1,31 +1,70 @@
+mod card;
+
+use card::TaskCard;
 use hirola::prelude::*;
 use plugy::macros::plugin_impl;
 use serde::{Deserialize, Serialize};
-use types::{FileEvent, HandleError, Plugin, RenderEvent, emit};
+use types::{
+    emit, CodeBlockKind, Context, Error, Event, File, LinkType, MarkdownEvent, Plugin, PluginEvent,
+    PulldownEvent, Rsx,
+};
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Tasks;
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
 pub enum TaskEvent {
+    #[serde(rename = "TaskEvent::Add")]
     Add,
-    Completed(u32), // Line Number
-    Delete { id: u32 },
+    #[serde(rename = "TaskEvent::Completed")]
+    Completed,
+    #[serde(rename = "TaskEvent::Delete")]
+    Delete,
 }
 
-
+impl PluginEvent for TaskEvent {
+    type Plugin = Tasks;
+}
 
 #[plugin_impl]
 impl Plugin for Tasks {
-    fn handle(&self, _msg: FileEvent) -> Result<bool, HandleError> {
-        Ok(false)
+    fn on_load(&self, ctx: &mut Context) -> Result<(), Error> {
+        ctx.subscribe(&TaskEvent::Add);
+        ctx.subscribe(&MarkdownEvent::Tag(types::Tag::Link(
+            LinkType::Email,
+            "/gmail.com/".to_owned(),
+            "".to_owned(),
+        )));
+        ctx.subscribe(&MarkdownEvent::Tag(types::Tag::CodeBlock(
+            CodeBlockKind::Fenced("rust".to_owned()),
+        )));
+        Ok(())
     }
-    fn render(&self, _evt: RenderEvent) -> String {
-        html! {
-            <div onclick={emit(&TaskEvent::Delete { id: 50 })}>
-                "Markdown Goes here"
-            </div>
+
+    fn process_file(&self, _ctx: &Context, file: File) -> Result<File, Error> {
+        match &file {
+            File::Markdown(file) => {
+                let _events: Vec<PulldownEvent<'_>> = file.get_contents();
+            }
+            _ => todo!(),
         }
-        .inner_html()
+        Ok(file)
+    }
+
+    fn on_event(&self, _ctx: &Context, _ev: Event) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn render(&self, _ctx: &Context, _ev: Event) -> Result<Rsx, Error> {
+        html! {
+            <>
+                <task-card on:click=emit(&TaskEvent::Add)/>
+                <math-field>{"test"}</math-field>
+                <script src="https://unpkg.com/mathlive"></script>
+                <TaskCard />
+            </>
+        }
+        .try_into()
     }
 }

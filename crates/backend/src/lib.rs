@@ -1,20 +1,24 @@
+mod mutation;
+pub mod query;
+
+use async_graphql::{http::GraphiQLSource, EmptySubscription, Schema};
+use async_graphql_axum::GraphQL;
 use axum::{
-    extract::Path,
     http::Method,
     response::{Html, IntoResponse},
     routing::get,
     Extension, Json, Router,
 };
-use oci_distribution::{manifest::{self, OciManifest}, secrets::RegistryAuth, Client, Reference};
-use plugy::{core::PluginLoader, runtime::Runtime};
-use std::future::Future;
-use std::pin::Pin;
+use plugy::runtime::Runtime;
+
 use std::{net::SocketAddr, ops::Deref, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 use types::{
-    config::{Config, PluginConfig},
-    FileEvent, Plugin, RenderEvent, UserInfo,
+    config::Config, BackendPlugin, Emitter, Fetcher, GlobalContext, Plugin, PluginContext, UserInfo,
 };
+use xtra::Mailbox;
+
+use crate::{mutation::MutationRoot, query::QueryRoot};
 
 pub type BoxedPlugin = Box<dyn Plugin>;
 
@@ -23,12 +27,12 @@ pub struct KasukuContext;
 
 #[derive(Clone)]
 pub struct KasukuRuntime {
-    inner: Arc<Runtime<BoxedPlugin>>,
+    inner: Arc<Runtime<BoxedPlugin, plugy::runtime::Plugin<BackendPlugin>>>,
     config: Config,
 }
 
 impl Deref for KasukuRuntime {
-    type Target = Arc<Runtime<BoxedPlugin>>;
+    type Target = Arc<Runtime<BoxedPlugin, plugy::runtime::Plugin<BackendPlugin>>>;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
@@ -36,86 +40,59 @@ impl Deref for KasukuRuntime {
 
 impl KasukuRuntime {
     pub async fn new(config: Config) -> Self {
-        let runtime = Arc::new(Runtime::new().unwrap());
+        let runtime = Runtime::new().unwrap();
+        let runtime = runtime.context(Fetcher).context(Emitter);
         for plugin in &config.plugins {
-            runtime
-                .load(BackendPlugin {
-                    inner: plugin.clone(),
+            let plugin: types::PluginWrapper<BackendPlugin, _> = runtime
+                .load_with(BackendPlugin {
+                    addr: xtra::spawn_tokio(
+                        PluginContext {
+                            inner: GlobalContext::default(),
+                        },
+                        Mailbox::unbounded(),
+                    ),
+                    name: plugin.name.clone(),
+                    uri: plugin.uri.clone(),
                 })
                 .await
                 .unwrap();
+            plugin.on_load(::types::Context::acquire()).await.unwrap();
         }
         KasukuRuntime {
-            inner: runtime,
+            inner: Arc::new(runtime),
             config,
         }
     }
 }
 
-pub struct BackendPlugin {
-    inner: PluginConfig,
-}
-
-#[allow(dead_code)]
-pub struct PluginLock {
-    uri: String,
-    digest: String,
-    manifest: OciManifest,
-    version: String,
-}
-
-impl PluginLoader for BackendPlugin {
-    fn name(&self) -> &'static str {
-        Box::leak((self.inner.name.clone()).into_boxed_str())
-    }
-    fn load(&self) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, anyhow::Error>>>> {
-        let reference = self.inner.uri.clone();
-        std::boxed::Box::pin(async move {
-
-            // TODO: Make client reusable
-            let mut client = Client::new(oci_distribution::client::ClientConfig {
-                protocol: oci_distribution::client::ClientProtocol::Https,
-                ..Default::default()
-            });
-            let reference: Reference = reference.parse().expect("Not a valid image reference");
-            let (_manifest, _) = client
-                .pull_manifest(&reference, &RegistryAuth::Anonymous)
-                .await
-                .expect("Cannot pull manifest");
-            let wasm = pull_wasm(&mut client, &reference).await;
-            Ok(wasm)
-        })
-    }
-}
-
-// Read the Plugin
-async fn pull_wasm(client: &mut Client, reference: &Reference) -> Vec<u8> {
-    let image_content = client
-        .pull(
-            reference,
-            &RegistryAuth::Anonymous,
-            vec![manifest::WASM_LAYER_MEDIA_TYPE],
-        )
-        .await
-        .expect("Cannot pull Wasm module")
-        .layers
-        .into_iter()
-        .next()
-        .map(|layer| layer)
-        .expect("No data found");
-    println!("Annotations: {:?}", image_content.annotations);
-    image_content.data
+async fn graphiql() -> impl IntoResponse {
+    Html(
+        GraphiQLSource::build()
+            .endpoint("/")
+            .subscription_endpoint("/ws")
+            .finish(),
+    )
 }
 
 pub async fn app<D: Send + Sync + Clone + 'static>(port: u16, data: D) {
+    // Setup graphql schema
+    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+        .data(data.clone())
+        .finish();
+    // Setup ws subscriptions
+
     let app = Router::new()
         .route("/user", get(user_handler))
         .route("/api/v1/config", get(get_config))
         .route(
-            "/api/v1/:namespace/:plugin/*path",
-            get(getter).post(do_action),
+            "/",
+            get(graphiql).post_service(GraphQL::new(schema.clone())),
         )
-        .route("/api/v1/:namespace/:plugin", get(getter))
+        // .route(
+        //     "/api/v1/:namespace/:plugin/*path",
+        //     get(getter).post(do_action),
+        // )
+        // .route("/api/v1/:namespace/:plugin", get(getter))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(vec![
             Method::GET,
             Method::POST,
@@ -133,29 +110,30 @@ pub async fn app<D: Send + Sync + Clone + 'static>(port: u16, data: D) {
         .unwrap();
 }
 
-async fn getter(
-    state: Extension<KasukuRuntime>,
-    Path((_module, plugin, _path)): Path<(String, String, String)>,
-) -> impl IntoResponse {
-    let plugin = state.get_plugin_by_name(&plugin).unwrap();
-    let res = plugin.render(RenderEvent::default()).await;
-    Html(res)
-}
+// async fn getter(
+//     state: Extension<KasukuRuntime>,
+//     Path((_module, plugin, _path)): Path<(String, String, String)>,
+// ) -> impl IntoResponse {
+//     let plugin = state.get_plugin_by_name(&plugin).unwrap();
+//     let res = plugin.render(RenderEvent::default()).await;
+//     Json(serde_json::from_slice::<serde_json::Value>(&res.0).unwrap())
+// }
 
-async fn do_action(
-    state: Extension<KasukuRuntime>,
-    Path((_module, plugin, _path)): Path<(String, String, String)>,
-    Json(data): Json<serde_json::Value>,
-) -> impl IntoResponse {
-    let plugin = state.get_plugin_by_name(&plugin).unwrap();
-    let _res = plugin
-        .handle(FileEvent::CustomAction(serde_json::to_vec(&data).unwrap()))
-        .await
-        .unwrap();
-    Html("res")
-}
+// async fn do_action(
+//     state: Extension<KasukuRuntime>,
+//     Path((_module, plugin, _path)): Path<(String, String, String)>,
+//     Json(data): Json<serde_json::Value>,
+// ) -> impl IntoResponse {
+//     let plugin = state.get_plugin_by_name(&plugin).unwrap();
+//     let _res = plugin
+//         .handle(FileEvent::CustomAction(serde_json::to_vec(&data).unwrap()))
+//         .await
+//         .unwrap();
+//     Html("res")
+// }
 
 async fn get_config(state: Extension<KasukuRuntime>) -> impl IntoResponse {
+    // let dom = Dom::new();
     Json(state.config.clone())
 }
 

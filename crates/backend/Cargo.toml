@@ -7,18 +7,22 @@ edition = "2021"
 
 [dependencies]
 axum = { version = "0.6", features = ["ws"] }
+async-graphql = { version = "6.0.11" }
+async-graphql-axum = "6.0.11"
 tower-http = { version = "0.4", features = ["cors"] }
 tokio = { version = "1.0", features = ["full"] }
 serde = "1"
 types = { path = "../types" }
-plugy = { version = "0.2.1", default-features = false, features = [
+plugy = { version = "0.3.1", default-features = false, features = [
     "runtime",
     "macros",
 ] }
 anyhow = "1"
 bincode = "1"
 heck = "0.4"
-oci-distribution = "0.9"
-hirola = { version = "0.3.1", features = ["ssr", "serde"] }
+hirola = { version = "0.4.0-beta.0", default-features = false }
 serde_json = "1"
 figment = { version = "0.10", features = ["toml", "env"] }
+walkdir = "2.4.0"
+notify = "6.1.1"
+xtra = { git = "https://github.com/Restioson/xtra", features = ["tokio", "macros"] }

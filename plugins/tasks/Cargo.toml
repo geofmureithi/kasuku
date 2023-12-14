@@ -9,9 +9,9 @@ crate-type = ["cdylib", "lib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-plugy = { version = "0.2.1" }
+plugy = { version = "0.3.1" }
 types = { path = "../../crates/types" }
 serde = { version = "1", features = ["derive"] }
-hirola = { version = "0.3.1", features = ["ssr", "serde"] }
-serde-json-wasm = "1.0.0"
+hirola = { version = "0.4.0-beta.0", default-features = false }
+serde_json = "1"
 serde_prefix = "0.1.0"
