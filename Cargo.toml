@@ -3,8 +3,10 @@ members = [
     "crates/backend",
     "crates/frontend",
     # "crates/tauri",
+    "crates/database",
     "crates/types",
-    "plugins/tasks"
+    "plugins/tasks",
+
 ]
 resolver = "2"
 

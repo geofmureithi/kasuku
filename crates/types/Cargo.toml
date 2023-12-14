@@ -24,3 +24,6 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["full"] }
 plugy = { version = "0.3.1", default-features = false, features = ["runtime"] }
 oci-distribution = "0.9"
+kasuku-database = { path = "../database" }
+
+

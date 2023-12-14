@@ -1,7 +1,10 @@
 pub mod config;
 pub mod node;
-
+#[cfg(not(target_arch = "wasm32"))]
+use async_trait::async_trait;
 use hirola::prelude::EventListener;
+#[cfg(not(target_arch = "wasm32"))]
+use kasuku_database::{prelude::Glue, KasukuDatabase};
 use node::Node;
 #[cfg(not(target_arch = "wasm32"))]
 use oci_distribution::Client;
@@ -13,9 +16,12 @@ use std::{
     future::Future,
     marker::PhantomData,
     pin::Pin,
+    sync::{Arc, Mutex},
 };
 #[cfg(not(target_arch = "wasm32"))]
 use xtra::Address;
+#[cfg(not(target_arch = "wasm32"))]
+use xtra::Handler;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -171,20 +177,21 @@ pub enum ViewType {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Default)]
+#[derive(xtra::Actor)]
 pub struct GlobalContext {
     listeners: HashMap<String, Vec<BackendPlugin>>,
-    // views: HashMap<ViewType, String>,
-    // plugins: HashMap<String, BackendPlugin>,
+    database: Arc<Mutex<Glue<KasukuDatabase>>>, // views: HashMap<ViewType, String>,
+                                                // plugins: HashMap<String, BackendPlugin>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl GlobalContext {
-    pub fn new() -> Self {
+    pub fn new(database: Arc<Mutex<Glue<KasukuDatabase>>>) -> Self {
         GlobalContext {
             // plugins: HashMap::new(),
             listeners: HashMap::new(),
             // views: HashMap::new(),
+            database,
         }
     }
 
@@ -239,6 +246,19 @@ impl Emitter {
         url: String,
     ) -> String {
         url
+    }
+}
+
+pub struct Database;
+
+#[plugy::macros::context(data = BackendPlugin)]
+impl Database {
+    pub async fn query(
+        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        sql: String,
+    ) -> String {
+        let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
+        addr.send(Query(sql)).await.unwrap()
     }
 }
 
@@ -337,10 +357,10 @@ impl Context {
         emitter::sync::Emitter::subscribe(serde_json::to_string_pretty(event).unwrap());
     }
 
-    // fn query(&self, sql: &str) -> Vec<u8> {
-    //     let res = database::sync::Database::query(sql.to_owned());
-    //     res
-    // }
+    pub fn query(&self, sql: &str) -> String {
+        let res = database::sync::Database::query(sql.to_owned());
+        serde_json::to_string(&res).unwrap()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -403,29 +423,23 @@ pub trait PluginEvent {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub type Addr = Address<PluginContext>;
+pub type Addr = Address<GlobalContext>;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(xtra::Actor)]
-pub struct PluginContext {
-    pub inner: GlobalContext,
+struct Query(String);
+
+#[cfg(not(target_arch = "wasm32"))]
+#[async_trait]
+impl Handler<Query> for GlobalContext {
+    type Return = String;
+
+    async fn handle(&mut self, sql: Query, _ctx: &mut xtra::Context<Self>) -> String {
+        let conn = &mut self.database;
+        let mut res = conn.lock().unwrap();
+        let res = res.execute(sql.0).unwrap();
+        serde_json::to_string(&res).unwrap()
+    }
 }
-
-// struct Query(String);
-
-// #[async_trait]
-// impl Handler<Query> for PluginContext {
-//     type Return = Vec<Payload>;
-
-//     async fn handle(&mut self, sql: Query, _ctx: &mut xtra::Context<Self>) -> Vec<Rows> {
-//         let conn = &mut self.connection;
-//         conn.call(|conn| {
-//             let mut stmt = conn.prepare("SELECT id, name, data FROM person").unwrap();
-//             Ok(stmt.query([]).unwrap())
-//         })
-//         .await
-//     }
-// }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]

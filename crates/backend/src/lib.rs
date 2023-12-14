@@ -9,13 +9,16 @@ use axum::{
     routing::get,
     Extension, Json, Router,
 };
+use kasuku_database::{prelude::Glue, KasukuDatabase};
 use plugy::runtime::Runtime;
 
-use std::{net::SocketAddr, ops::Deref, sync::Arc};
-use tower_http::cors::{Any, CorsLayer};
-use types::{
-    config::Config, BackendPlugin, Emitter, Fetcher, GlobalContext, Plugin, PluginContext, UserInfo,
+use std::{
+    net::SocketAddr,
+    ops::Deref,
+    sync::{Arc, Mutex},
 };
+use tower_http::cors::{Any, CorsLayer};
+use types::{config::Config, BackendPlugin, Emitter, Fetcher, GlobalContext, Plugin, UserInfo, Database};
 use xtra::Mailbox;
 
 use crate::{mutation::MutationRoot, query::QueryRoot};
@@ -40,17 +43,14 @@ impl Deref for KasukuRuntime {
 
 impl KasukuRuntime {
     pub async fn new(config: Config) -> Self {
+        let mut db = Glue::new(KasukuDatabase::new("/tmp/kasuku-6").await.unwrap());
+        let db = Arc::new(Mutex::new(db));
         let runtime = Runtime::new().unwrap();
-        let runtime = runtime.context(Fetcher).context(Emitter);
+        let runtime = runtime.context(Fetcher).context(Emitter).context(Database);
         for plugin in &config.plugins {
             let plugin: types::PluginWrapper<BackendPlugin, _> = runtime
                 .load_with(BackendPlugin {
-                    addr: xtra::spawn_tokio(
-                        PluginContext {
-                            inner: GlobalContext::default(),
-                        },
-                        Mailbox::unbounded(),
-                    ),
+                    addr: xtra::spawn_tokio(GlobalContext::new(db.clone()), Mailbox::bounded(100)),
                     name: plugin.name.clone(),
                     uri: plugin.uri.clone(),
                 })

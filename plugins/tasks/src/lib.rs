@@ -39,6 +39,16 @@ impl Plugin for Tasks {
         ctx.subscribe(&MarkdownEvent::Tag(types::Tag::CodeBlock(
             CodeBlockKind::Fenced("rust".to_owned()),
         )));
+        ctx.query(
+            "CREATE TABLE Tasks (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
+                due INTEGER,
+                meta TEXT
+            );
+            INSERT INTO Tasks(id, name) VALUES(1, 'Test Task');",
+        );
         Ok(())
     }
 
@@ -56,11 +66,12 @@ impl Plugin for Tasks {
         Ok(())
     }
 
-    fn render(&self, _ctx: &Context, _ev: Event) -> Result<Rsx, Error> {
+    fn render(&self, ctx: &Context, _ev: Event) -> Result<Rsx, Error> {
+        let res = ctx.query("Select id, name from Tasks");
         html! {
             <>
                 <task-card on:click=emit(&TaskEvent::Add)/>
-                <math-field>{"test"}</math-field>
+                <span>{res}</span>
                 <script src="https://unpkg.com/mathlive"></script>
                 <TaskCard />
             </>
