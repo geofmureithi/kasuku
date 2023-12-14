@@ -214,7 +214,6 @@ fn main() {
 
     app.mount_to(&parent_node);
 
-    
     // std::mem::forget(root);
     // routes:
     // / -> home

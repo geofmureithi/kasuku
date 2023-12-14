@@ -1,8 +1,7 @@
-
-use ::types::{Event, Emit};
+use ::types::{Emit, Event};
 use async_graphql::*;
 
-use crate::{KasukuRuntime, BackendPlugin};
+use crate::{BackendPlugin, KasukuRuntime};
 
 pub struct QueryRoot;
 
@@ -47,7 +46,8 @@ pub struct RenderResult {
 impl QueryRoot {
     async fn render(&self, ctx: &Context<'_>, _req: Render) -> serde_json::Value {
         let runtime: &KasukuRuntime = ctx.data().unwrap();
-        let plugin: ::types::PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name("tasks").unwrap();
+        let plugin: ::types::PluginWrapper<BackendPlugin, _> =
+            runtime.get_plugin_by_name("tasks").unwrap();
         let res = plugin
             .render(
                 ::types::Context::acquire(),
@@ -55,14 +55,13 @@ impl QueryRoot {
                     path: "text".to_string(),
                     data: Emit {
                         data: vec![],
-                        r#type: "Event".to_string()
-                    }
+                        r#type: "Event".to_string(),
+                    },
                 },
             )
             .await
             .unwrap();
-        let json = serde_json::from_slice(&res.0).unwrap();
-        json
+        serde_json::from_slice(&res.0).unwrap()
     }
     async fn list_files(&self) -> Vec<File> {
         vec![]

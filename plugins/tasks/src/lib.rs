@@ -6,7 +6,7 @@ use plugy::macros::plugin_impl;
 use serde::{Deserialize, Serialize};
 use types::{
     emit, CodeBlockKind, Context, Error, Event, File, LinkType, MarkdownEvent, Plugin, PluginEvent,
-    Rsx, PulldownEvent,
+    PulldownEvent, Rsx,
 };
 
 #[derive(Debug, Deserialize, Default)]
@@ -46,7 +46,7 @@ impl Plugin for Tasks {
         match &file {
             File::Markdown(file) => {
                 let _events: Vec<PulldownEvent<'_>> = file.get_contents();
-            },
+            }
             _ => todo!(),
         }
         Ok(file)

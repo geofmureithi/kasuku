@@ -503,7 +503,6 @@ async fn pull_wasm(client: &mut Client, reference: &Reference) -> Vec<u8> {
         .layers
         .into_iter()
         .next()
-        .map(|layer| layer)
         .expect("No data found");
     println!("Annotations: {:?}", image_content.annotations);
     image_content.data
