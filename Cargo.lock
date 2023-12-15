@@ -3632,6 +3632,7 @@ dependencies = [
  "serde-error",
  "serde_json",
  "solvent",
+ "sqlparser",
  "thiserror",
  "tokio",
  "url",

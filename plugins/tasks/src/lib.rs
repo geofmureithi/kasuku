@@ -39,7 +39,7 @@ impl Plugin for Tasks {
         ctx.subscribe(&MarkdownEvent::Tag(types::Tag::CodeBlock(
             CodeBlockKind::Fenced("rust".to_owned()),
         )));
-        ctx.query(
+        ctx.execute(
             "CREATE TABLE Tasks (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,

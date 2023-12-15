@@ -3,6 +3,7 @@ pub mod node;
 #[cfg(not(target_arch = "wasm32"))]
 use async_trait::async_trait;
 use hirola::prelude::EventListener;
+use kasuku_database::prelude::{ast::Statement, parse};
 #[cfg(not(target_arch = "wasm32"))]
 use kasuku_database::{prelude::Glue, KasukuDatabase};
 use node::Node;
@@ -358,13 +359,27 @@ impl Context {
     }
 
     pub fn query(&self, sql: &str) -> String {
+        let req = parse(&sql).unwrap();
+        if req
+            .iter()
+            .find(|r| match r {
+                sqlparser::ast::Statement::Query(_) => false,
+                _ => true,
+            })
+            .is_some()
+        {
+            panic!("Tried to modify database in non-mutable context. Please use execute()")
+        }
+        let res = database::sync::Database::query(sql.to_owned());
+        serde_json::to_string(&res).unwrap()
+    }
+
+    pub fn execute(&mut self, sql: &str) -> String {
         let res = database::sync::Database::query(sql.to_owned());
         serde_json::to_string(&res).unwrap()
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Intercept;
 
 #[allow(unused_variables)]
 #[plugy::macros::plugin]

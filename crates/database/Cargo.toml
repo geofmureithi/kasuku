@@ -10,12 +10,7 @@ anyhow = "1"
 futures = "0.3"
 gluesql-core = { version = "0.14.0", default-features = false }
 baildon = { version = "0.1.2" }
-# libc.workspace = true
-# rustyline.workspace = true
 serde = "1"
 serde_json = { version = "1.0.107", features = ["preserve_order"] }
-# strum.workspace = true
 tokio = "1"
-# tracing.workspace = true
-# tracing-appender.workspace = true
-# tracing-subscriber.workspace = true
+
