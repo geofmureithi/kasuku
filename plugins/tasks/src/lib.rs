@@ -40,14 +40,13 @@ impl Plugin for Tasks {
             CodeBlockKind::Fenced("rust".to_owned()),
         )));
         ctx.execute(
-            "CREATE TABLE Tasks (
+            "CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 completed INTEGER NOT NULL DEFAULT 0,
                 due INTEGER,
                 meta TEXT
-            );
-            INSERT INTO Tasks(id, name) VALUES(1, 'Test Task');",
+            );",
         );
         Ok(())
     }

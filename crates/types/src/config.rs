@@ -7,9 +7,8 @@ use std::fmt;
 use std::path::PathBuf;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Config {
-    pub apps: BTreeMap<String, AppConfig>,
+    pub vaults: BTreeMap<String, VaultConfig>,
     pub events: BTreeMap<String, Vec<String>>,
     pub internals: Internals,
     #[serde(deserialize_with = "deserialize_plugins")]
@@ -23,7 +22,6 @@ where
     struct PluginVisitor;
 
     #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     struct InnerPlugin {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub headless: Option<bool>,
@@ -61,21 +59,19 @@ where
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AppConfig {
-    pub mount: String,
+pub struct VaultConfig {
+    pub mount: PathBuf,
     pub plugins: Vec<String>,
+    pub file_types: Vec<String>
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Internals {
     #[serde(rename = "cache-path")]
-    pub cache: PathBuf,
+    pub database_path: PathBuf,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PluginConfig {
     pub name: String,
     pub headless: bool,
@@ -84,7 +80,6 @@ pub struct PluginConfig {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct RemoteConfig {
     pub friendly_name: String,
     pub description: String,
@@ -101,7 +96,7 @@ pub enum EventSource {
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
         let mut dep_graph: DepGraph<&str> = DepGraph::new();
-        for (title, app) in &self.apps {
+        for (title, app) in &self.vaults {
             dep_graph.register_dependencies(title, app.plugins.iter().map(|s| &**s).collect())
         }
         // TODO: check validity of dependencies

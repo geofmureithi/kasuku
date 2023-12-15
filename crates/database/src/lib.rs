@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::ops::ControlFlow;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
 use futures::StreamExt;
-use gluesql_core::data::{Schema, Key};
+use gluesql_core::data::{Key, Schema};
 use gluesql_core::error::Error;
 use gluesql_core::store::{
     AlterTable, CustomFunction, CustomFunctionMut, DataRow, Index, IndexMut, Metadata, RowIter,
@@ -24,10 +24,9 @@ use baildon::btree::Direction;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub mod prelude {
-    pub use gluesql_core::prelude::*;
     pub use super::KasukuDatabase as Database;
+    pub use gluesql_core::prelude::*;
 }
-
 
 pub struct KasukuDatabase {
     pub schemas: Baildon<String, Schema>,
@@ -43,7 +42,8 @@ pub(crate) struct BaildonConfig {
 }
 
 impl KasukuDatabase {
-    pub async fn new(path: &str) -> Result<Self> {
+    pub async fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref();
         // Create our path
         tokio::fs::create_dir_all(path)
             .await
@@ -69,7 +69,7 @@ impl KasukuDatabase {
             .map_err(|e| Error::StorageMsg(e.to_string()))?
         {
             return Err(Error::StorageMsg(format!(
-                "database '{path}' already exists"
+                "database '{path:?}' already exists"
             )));
         }
         let schemas: Baildon<String, Schema> = Baildon::try_new(&canonical_path, 13)
@@ -88,13 +88,13 @@ impl KasukuDatabase {
         })
     }
 
-    pub async fn open(path: &str) -> Result<Self> {
-        let mut db_file = PathBuf::from(path);
+    pub async fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let mut db_file = PathBuf::from(path.as_ref());
         db_file.push("schema");
         db_file.set_extension("db");
         let schemas: Baildon<String, Schema> = Baildon::try_open(&db_file)
             .await
-            .map_err(|e| Error::StorageMsg(e.to_string()))?;
+            .map_err(|e| Error::StorageMsg(format!("Failed to read schemas: {e}")))?;
 
         // let mut f_path = PathBuf::from(db_file);
         db_file.set_extension("cfg");
@@ -104,14 +104,14 @@ impl KasukuDatabase {
             .create(false)
             .open(&db_file)
             .await
-            .map_err(|e| Error::StorageMsg(e.to_string()))?;
+            .map_err(|e| Error::StorageMsg(format!("Failed to read cfg file: {e}")))?;
         let mut s_cfg = String::new();
         let _ = file
             .read_to_string(&mut s_cfg)
             .await
             .map_err(|e| Error::StorageMsg(e.to_string()))?;
-        let config: BaildonConfig =
-            serde_json::from_str(&s_cfg).map_err(|e| Error::StorageMsg(e.to_string()))?;
+        let config: BaildonConfig = serde_json::from_str(&s_cfg)
+            .map_err(|e| Error::StorageMsg(format!("Failed to read config json: {e}")))?;
         Ok(KasukuDatabase {
             schemas,
             config,

@@ -1,8 +1,10 @@
 [internals]
 cache-path = "./cache"
 
-[apps]
-planning = { plugins = ["tasks"], mount = "./Tasks" }
+[vaults.planning]
+plugins = ["tasks"]
+mount = "/home/geoff/Documents/kasuku"
+file_types = ["md"]
 # budget = { plugins = ["tasks", "finance", "schedule"], mount = "./Bills" }
 # entertainment = { plugins = ["files", "spotify", "audible"], mount = "./Media" }
 

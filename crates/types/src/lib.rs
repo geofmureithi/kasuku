@@ -3,7 +3,6 @@ pub mod node;
 #[cfg(not(target_arch = "wasm32"))]
 use async_trait::async_trait;
 use hirola::prelude::EventListener;
-use kasuku_database::prelude::parse;
 #[cfg(not(target_arch = "wasm32"))]
 use kasuku_database::{prelude::Glue, KasukuDatabase};
 use node::Node;
@@ -11,6 +10,7 @@ use node::Node;
 use oci_distribution::Client;
 pub use pulldown_cmark::{Alignment, Event as PulldownEvent, HeadingLevel, LinkType};
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
 use std::{
     collections::HashMap,
     fmt::{self},
@@ -155,6 +155,8 @@ pub enum Error {
     Serde(#[from] serde_error::Error),
     #[error("a render was requested but cannot be completed")]
     InvalidRender,
+    #[error("parse sql error")]
+    SqlParser,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -530,4 +532,10 @@ async fn pull_wasm(client: &mut Client, reference: &Reference) -> Vec<u8> {
         .expect("No data found");
     println!("Annotations: {:?}", image_content.annotations);
     image_content.data
+}
+
+const DIALECT: PostgreSqlDialect = PostgreSqlDialect {};
+
+pub fn parse<Sql: AsRef<str>>(sql: Sql) -> Result<Vec<Statement>, Error> {
+    Parser::parse_sql(&DIALECT, sql.as_ref()).map_err(|_e| Error::SqlParser)
 }

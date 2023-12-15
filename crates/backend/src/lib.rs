@@ -3,6 +3,7 @@ pub mod query;
 
 use async_graphql::{http::GraphiQLSource, EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
+use async_walkdir::{Filtering, WalkDir};
 use axum::{
     http::Method,
     response::{Html, IntoResponse},
@@ -18,7 +19,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tower_http::cors::{Any, CorsLayer};
-use types::{config::Config, BackendPlugin, Emitter, Fetcher, GlobalContext, Plugin, UserInfo, Database};
+use types::{
+    config::Config, BackendPlugin, Database, Emitter, Fetcher, GlobalContext, Plugin, UserInfo,
+};
 use xtra::Mailbox;
 
 use crate::{mutation::MutationRoot, query::QueryRoot};
@@ -32,6 +35,7 @@ pub struct KasukuContext;
 pub struct KasukuRuntime {
     inner: Arc<Runtime<BoxedPlugin, plugy::runtime::Plugin<BackendPlugin>>>,
     config: Config,
+    database: Arc<Mutex<Glue<KasukuDatabase>>>,
 }
 
 impl Deref for KasukuRuntime {
@@ -43,7 +47,21 @@ impl Deref for KasukuRuntime {
 
 impl KasukuRuntime {
     pub async fn new(config: Config) -> Self {
-        let db = Glue::new(KasukuDatabase::new("/tmp/kasuku-6").await.unwrap());
+        use futures::FutureExt;
+        let ks = KasukuDatabase::open(&config.internals.database_path)
+            .then(|res| async {
+                if res.is_err() {
+                    let new_db = KasukuDatabase::new(&config.internals.database_path)
+                        .await
+                        .unwrap();
+                    new_db.save().await.unwrap();
+                    return new_db;
+                }
+                res.unwrap()
+            })
+            .await;
+        let db = Glue::new(ks);
+
         let db = Arc::new(Mutex::new(db));
         let runtime = Runtime::new().unwrap();
         let runtime = runtime.context(Fetcher).context(Emitter).context(Database);
@@ -58,9 +76,80 @@ impl KasukuRuntime {
                 .unwrap();
             plugin.on_load(::types::Context::acquire()).await.unwrap();
         }
+        // db.lock().unwrap().storage.save().await.unwrap();
+        db.lock()
+            .as_mut()
+            .unwrap()
+            .execute(
+                "CREATE TABLE IF NOT EXISTS vaults (
+                    name TEXT NOT NULL PRIMARY KEY,
+                    mount TEXT NOT NULL,
+                ); 
+                CREATE TABLE IF NOT EXISTS entries (
+                    path TEXT NOT NULL PRIMARY KEY,
+                    vault TEXT NOT NULL,
+                    last_modified INTEGER,
+                    meta TEXT
+                )",
+            )
+            .unwrap();
+
+        for (vault, vault_config) in config.vaults.clone() {
+            let mount = vault_config.mount.clone();
+            // let db_clone = Arc::clone(&db);
+            let _res = db
+                .lock()
+                .as_mut()
+                .unwrap()
+                .execute(format!(
+                    "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}') ON CONFLICT(name) DO 
+                         UPDATE SET mount = EXCLUDED.mount",
+                    mount.to_str().unwrap()
+                ))
+                .unwrap_or(vec![]);
+
+            // tokio::spawn(async move {
+            use futures::stream::StreamExt;
+            let mut entries = WalkDir::new(mount).filter(|entry| async move {
+                if let Some(true) = entry
+                    .path()
+                    .file_name()
+                    .map(|f| f.to_string_lossy().starts_with('.'))
+                {
+                    return Filtering::IgnoreDir;
+                }
+                if let Some(true) = entry
+                    .path()
+                    .file_name()
+                    .map(|f| f.to_string_lossy().ends_with(".md"))
+                {
+                    return Filtering::Continue;
+                }
+                Filtering::Ignore
+            });
+            loop {
+                match entries.next().await {
+                    Some(Ok(entry)) => {
+                        println!("file: {}", entry.path().display());
+                        let _res = db.lock().unwrap().execute(format!(
+                            "INSERT INTO entries(path, vault) VALUES('{}', '{}')",
+                            entry.path().display(),
+                            vault
+                        ));
+                    }
+                    Some(Err(e)) => {
+                        eprintln!("error: {}", e);
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            // });
+        }
         KasukuRuntime {
             inner: Arc::new(runtime),
             config,
+            database: db,
         }
     }
 }
