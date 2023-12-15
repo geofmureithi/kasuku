@@ -43,7 +43,7 @@ impl Deref for KasukuRuntime {
 
 impl KasukuRuntime {
     pub async fn new(config: Config) -> Self {
-        let mut db = Glue::new(KasukuDatabase::new("/tmp/kasuku-6").await.unwrap());
+        let db = Glue::new(KasukuDatabase::new("/tmp/kasuku-6").await.unwrap());
         let db = Arc::new(Mutex::new(db));
         let runtime = Runtime::new().unwrap();
         let runtime = runtime.context(Fetcher).context(Emitter).context(Database);

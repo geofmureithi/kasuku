@@ -3,7 +3,7 @@ pub mod node;
 #[cfg(not(target_arch = "wasm32"))]
 use async_trait::async_trait;
 use hirola::prelude::EventListener;
-use kasuku_database::prelude::{ast::Statement, parse};
+use kasuku_database::prelude::parse;
 #[cfg(not(target_arch = "wasm32"))]
 use kasuku_database::{prelude::Glue, KasukuDatabase};
 use node::Node;
@@ -359,14 +359,10 @@ impl Context {
     }
 
     pub fn query(&self, sql: &str) -> String {
-        let req = parse(&sql).unwrap();
+        let req = parse(sql).unwrap();
         if req
             .iter()
-            .find(|r| match r {
-                sqlparser::ast::Statement::Query(_) => false,
-                _ => true,
-            })
-            .is_some()
+            .any(|r| !matches!(r, sqlparser::ast::Statement::Query(_)))
         {
             panic!("Tried to modify database in non-mutable context. Please use execute()")
         }
@@ -379,7 +375,6 @@ impl Context {
         serde_json::to_string(&res).unwrap()
     }
 }
-
 
 #[allow(unused_variables)]
 #[plugy::macros::plugin]
