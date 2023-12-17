@@ -60,7 +60,30 @@ impl KasukuRuntime {
                 res.unwrap()
             })
             .await;
-        let db = Glue::new(ks);
+        let mut db = Glue::new(ks);
+        db.execute(
+            "
+                DROP TABLE subscriptions;
+                DROP TABLE vaults;
+                DROP TABLE entries;
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    plugin TEXT NOT NULL,
+                    event TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    data TEXT
+                );
+                CREATE TABLE IF NOT EXISTS vaults (
+                    name TEXT NOT NULL PRIMARY KEY,
+                    mount TEXT NOT NULL,
+                ); 
+                CREATE TABLE IF NOT EXISTS entries (
+                    path TEXT NOT NULL PRIMARY KEY,
+                    vault TEXT NOT NULL,
+                    last_modified INTEGER,
+                    meta TEXT
+                )",
+        )
+        .unwrap();
 
         let db = Arc::new(Mutex::new(db));
         let runtime = Runtime::new().unwrap();
@@ -76,23 +99,6 @@ impl KasukuRuntime {
                 .unwrap();
             plugin.on_load(::types::Context::acquire()).await.unwrap();
         }
-        // db.lock().unwrap().storage.save().await.unwrap();
-        db.lock()
-            .as_mut()
-            .unwrap()
-            .execute(
-                "CREATE TABLE IF NOT EXISTS vaults (
-                    name TEXT NOT NULL PRIMARY KEY,
-                    mount TEXT NOT NULL,
-                ); 
-                CREATE TABLE IF NOT EXISTS entries (
-                    path TEXT NOT NULL PRIMARY KEY,
-                    vault TEXT NOT NULL,
-                    last_modified INTEGER,
-                    meta TEXT
-                )",
-            )
-            .unwrap();
 
         for (vault, vault_config) in config.vaults.clone() {
             let mount = vault_config.mount.clone();
@@ -105,8 +111,7 @@ impl KasukuRuntime {
                     "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}') ON CONFLICT(name) DO 
                          UPDATE SET mount = EXCLUDED.mount",
                     mount.to_str().unwrap()
-                ))
-                .unwrap_or(vec![]);
+                ));
 
             // tokio::spawn(async move {
             use futures::stream::StreamExt;
@@ -130,7 +135,6 @@ impl KasukuRuntime {
             loop {
                 match entries.next().await {
                     Some(Ok(entry)) => {
-                        println!("file: {}", entry.path().display());
                         let _res = db.lock().unwrap().execute(format!(
                             "INSERT INTO entries(path, vault) VALUES('{}', '{}')",
                             entry.path().display(),
@@ -177,11 +181,6 @@ pub async fn app<D: Send + Sync + Clone + 'static>(port: u16, data: D) {
             "/",
             get(graphiql).post_service(GraphQL::new(schema.clone())),
         )
-        // .route(
-        //     "/api/v1/:namespace/:plugin/*path",
-        //     get(getter).post(do_action),
-        // )
-        // .route("/api/v1/:namespace/:plugin", get(getter))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(vec![
             Method::GET,
             Method::POST,

@@ -1,7 +1,8 @@
 [internals]
-cache-path = "./cache"
+cache-path = "/tmp/kasuku-cache"
 
 [vaults.planning]
+label = "Planning"
 plugins = ["tasks"]
 mount = "/home/geoff/Documents/kasuku"
 file_types = ["md"]

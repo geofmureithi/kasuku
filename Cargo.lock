@@ -385,6 +385,8 @@ dependencies = [
  "kasuku-database",
  "notify",
  "plugy",
+ "pulldown-cmark",
+ "pulldown-cmark-to-cmark",
  "serde",
  "serde_json",
  "tokio",
@@ -2623,6 +2625,15 @@ dependencies = [
  "memchr",
  "serde",
  "unicase",
+]
+
+[[package]]
+name = "pulldown-cmark-to-cmark"
+version = "11.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a883e495f8fc4f209521b03a89dde6f6f211ed7cf92e85693c82508e8b722710"
+dependencies = [
+ "pulldown-cmark",
 ]
 
 [[package]]
