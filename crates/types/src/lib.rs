@@ -10,7 +10,6 @@ use node::Node;
 use oci_distribution::Client;
 pub use pulldown_cmark::{Alignment, CowStr, Event as PulldownEvent, HeadingLevel, LinkType};
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::json;
 use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
 use std::{
     collections::HashMap,
@@ -182,9 +181,7 @@ impl Task {
 pub enum Entity {
     Task(Task),
     Event,
-    Note,
-    Reminder,
-    Habit,
+    // Reminder,
 }
 
 #[derive(Debug, Serialize, Deserialize, thiserror::Error)]
@@ -383,10 +380,10 @@ impl Context {
         todo!()
     }
 
-    pub fn subscribe<E: PluginEvent + Serialize>(&mut self, event: &E) -> Result<String, ()> {
-        let value = serde_json::to_value(&event).unwrap();
+    pub fn subscribe<E: PluginEvent + Serialize>(&mut self, event: &E) -> Result<(), String> {
+        let value = serde_json::to_value(event).unwrap();
         let raw_event_type: Vec<&str> = value["type"].as_str().unwrap().split("::").collect();
-        let event = raw_event_type.get(0).unwrap().to_string();
+        let event = raw_event_type.first().unwrap().to_string();
         let event_type = raw_event_type.get(1).unwrap().to_string();
         let data = serde_json::to_string(&value).unwrap();
         emitter::sync::Emitter::subscribe(Subscription {
@@ -394,6 +391,8 @@ impl Context {
             event,
             event_type,
         })
+        .unwrap();
+        Ok(())
     }
 
     pub fn query(&self, sql: &str) -> String {

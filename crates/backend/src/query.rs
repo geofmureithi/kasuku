@@ -48,7 +48,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         path: String,
-        renderer: Option<String>,
+        _renderer: Option<String>,
     ) -> serde_json::Value {
         let runtime: &KasukuRuntime = ctx.data().unwrap();
         let res = runtime
@@ -60,11 +60,11 @@ impl QueryRoot {
         let subscriptions = res.get(0).unwrap();
         match subscriptions {
             Payload::Select { rows, .. } => {
-                let filters: Vec<MarkdownEvent> = rows
+                let _filters: Vec<MarkdownEvent> = rows
                     .iter()
                     .map(|row| match row.get(3).unwrap() {
                         kasuku_database::prelude::Value::Str(val) => {
-                            serde_json::from_str(&val).unwrap()
+                            serde_json::from_str(val).unwrap()
                         }
                         _ => unreachable!(),
                     })
@@ -77,13 +77,12 @@ impl QueryRoot {
                     .await
                     .unwrap();
                 let mut buf = String::new();
-                let md_events: Vec<pulldown_cmark::Event<'_>> =match &md {
+                let md_events: Vec<pulldown_cmark::Event<'_>> = match &md {
                     ::types::File::Markdown(inner) => inner.get_contents(),
                     _ => unreachable!(),
                 };
                 pulldown_cmark_to_cmark::cmark(md_events.iter(), &mut buf).unwrap();
                 println!("{buf}");
-
             }
             _ => unreachable!(),
         };
@@ -110,13 +109,11 @@ impl QueryRoot {
         let mut lock = runtime.database.lock();
         let db = lock.as_mut();
         let database = db.unwrap();
-        let res = database
-            .execute(format!("Select name, mount from vaults"))
-            .unwrap();
+        let res = database.execute("Select name, mount from vaults").unwrap();
         let payload = res.get(0).unwrap();
         match payload {
             Payload::Select { rows, .. } => rows
-                .into_iter()
+                .iter()
                 .map(|row| Vault {
                     name: row.get(0).unwrap().into(),
                     mount: row.get(1).unwrap().into(),
@@ -162,7 +159,7 @@ impl Vault {
         let payload = res.get(0).unwrap();
         match payload {
             Payload::Select { rows, .. } => rows
-                .into_iter()
+                .iter()
                 .map(|row| File {
                     path: row.get(0).unwrap().into(),
                 })

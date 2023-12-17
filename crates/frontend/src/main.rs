@@ -262,7 +262,6 @@ fn main() {
     app.route("/plugins/:plugin", home); // View specific plugin
     app.route("/plugins/:plugin/config", home); // Config specific plugin
 
-
     let parent_node = web_sys::window()
         .unwrap()
         .document()

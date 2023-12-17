@@ -103,15 +103,11 @@ impl KasukuRuntime {
         for (vault, vault_config) in config.vaults.clone() {
             let mount = vault_config.mount.clone();
             // let db_clone = Arc::clone(&db);
-            let _res = db
-                .lock()
-                .as_mut()
-                .unwrap()
-                .execute(format!(
-                    "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}') ON CONFLICT(name) DO 
+            let _res = db.lock().as_mut().unwrap().execute(format!(
+                "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}') ON CONFLICT(name) DO 
                          UPDATE SET mount = EXCLUDED.mount",
-                    mount.to_str().unwrap()
-                ));
+                mount.to_str().unwrap()
+            ));
 
             // tokio::spawn(async move {
             use futures::stream::StreamExt;

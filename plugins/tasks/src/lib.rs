@@ -5,8 +5,8 @@ use hirola::prelude::*;
 use plugy::macros::plugin_impl;
 use serde::{Deserialize, Serialize};
 use types::{
-    emit, CodeBlockKind, Context, CowStr, Error, Event, File, LinkType, MarkdownEvent,
-    MarkdownFile, Plugin, PluginEvent, PulldownEvent, Rsx, Tag, Task,
+    emit, CodeBlockKind, Context, Error, Event, File, LinkType, MarkdownEvent, Plugin, PluginEvent,
+    PulldownEvent, Rsx, Task,
 };
 
 #[derive(Debug, Deserialize, Default)]
@@ -30,15 +30,17 @@ impl PluginEvent for TaskEvent {
 #[plugin_impl]
 impl Plugin for Tasks {
     fn on_load(&self, ctx: &mut Context) -> Result<(), Error> {
-        ctx.subscribe(&TaskEvent::Add);
+        ctx.subscribe(&TaskEvent::Add).unwrap();
         ctx.subscribe(&MarkdownEvent::Tag(types::Tag::Link(
             LinkType::Email,
             "/gmail.com/".to_owned(),
             "".to_owned(),
-        )));
+        )))
+        .unwrap();
         ctx.subscribe(&MarkdownEvent::Tag(types::Tag::CodeBlock(
             CodeBlockKind::Fenced("rust".to_owned()),
-        )));
+        )))
+        .unwrap();
         ctx.execute(
             "CREATE TABLE IF NOT EXISTS tasks (
                 text TEXT NOT NULL,
@@ -51,29 +53,19 @@ impl Plugin for Tasks {
     }
 
     fn process_file(&self, ctx: &Context, file: File) -> Result<File, Error> {
-        match file {
-            File::Markdown(ref file) => {
-                let events: Vec<PulldownEvent<'_>> = file.get_contents();
+        if let File::Markdown(ref file) = file {
+            let events: Vec<PulldownEvent<'_>> = file.get_contents();
 
-                for (index, event) in events.iter().enumerate() {
-                    match event {
-                        PulldownEvent::TaskListMarker(state) => {
-                            let next = events.get(index + 1);
-                            if let Some(ev) = next {
-                                match ev {
-                                    PulldownEvent::Text(text) => {
-                                        ctx.add_task(&Task::new(text.to_string()))
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        _ => {}
+            for (index, event) in events.iter().enumerate() {
+                if let PulldownEvent::TaskListMarker(_state) = event {
+                    let next = events.get(index + 1);
+                    if let Some(PulldownEvent::Text(text)) = next {
+                        ctx.add_task(&Task::new(text.to_string()))
                     }
                 }
             }
-            _ => todo!(),
         }
+
         Ok(file)
     }
 
@@ -93,8 +85,4 @@ impl Plugin for Tasks {
         }
         .try_into()
     }
-}
-
-fn replace_text(original_text: &str) -> String {
-    original_text.replace("expected", "concluded")
 }
