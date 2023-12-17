@@ -1,0 +1,16 @@
+[package]
+name = "kasuku-database"
+version = "0.1.0"
+readme = "README.md"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1.73"
+anyhow = "1"
+futures = "0.3"
+gluesql-core = { version = "0.14.0", default-features = false }
+baildon = { version = "0.1.2" }
+serde = "1"
+serde_json = { version = "1.0.107", features = ["preserve_order"] }
+tokio = "1"
+

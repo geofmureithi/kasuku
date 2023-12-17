@@ -17,6 +17,7 @@ url = { version = "2", features = ["serde"] }
 bincode = "1"
 thiserror =  "1"
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
+sqlparser = "0.30"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 xtra = { git = "https://github.com/Restioson/xtra", features = ["tokio", "macros"] }
@@ -24,3 +25,6 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["full"] }
 plugy = { version = "0.3.1", default-features = false, features = ["runtime"] }
 oci-distribution = "0.9"
+kasuku-database = { path = "../database" }
+
+

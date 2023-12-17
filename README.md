@@ -6,7 +6,7 @@ Kasuku is a all-in-one personal management system using wasm
 
 ## Todo Features
 
-- [**Tasks:**](/plugins/tasks/) Stay on top of your to-do list and tasks. Mark tasks as complete, set priorities, and organize your day.
+- [**📝Tasks:**](/plugins/tasks/) Stay on top of your to-do list and tasks. Mark tasks as complete, set priorities, and organize your day.
 
 - **Notes:** Capture your thoughts, ideas, and inspirations. Organize notes into categories and easily search for them.
 

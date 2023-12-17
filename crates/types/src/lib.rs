@@ -1,21 +1,29 @@
 pub mod config;
 pub mod node;
-
+#[cfg(not(target_arch = "wasm32"))]
+use async_trait::async_trait;
 use hirola::prelude::EventListener;
+#[cfg(not(target_arch = "wasm32"))]
+use kasuku_database::{prelude::Glue, KasukuDatabase};
 use node::Node;
 #[cfg(not(target_arch = "wasm32"))]
 use oci_distribution::Client;
-pub use pulldown_cmark::{Alignment, Event as PulldownEvent, HeadingLevel, LinkType};
+pub use pulldown_cmark::{Alignment, CowStr, Event as PulldownEvent, HeadingLevel, LinkType};
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
 use std::{
     collections::HashMap,
     fmt::{self},
     future::Future,
     marker::PhantomData,
+    path::Path,
     pin::Pin,
+    sync::{Arc, Mutex},
 };
 #[cfg(not(target_arch = "wasm32"))]
 use xtra::Address;
+#[cfg(not(target_arch = "wasm32"))]
+use xtra::Handler;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -26,13 +34,13 @@ pub struct UserInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct MarkdownFile<D, C> {
-    frontmatter: D,
+    pub frontmatter: D,
     pub content: C,
 }
 
-impl<D> MarkdownFile<D, Vec<u8>> {
+impl MarkdownFile<Vec<u8>, Vec<u8>> {
     pub fn get_contents<'a: 'de, 'de, C: Deserialize<'de>>(&'a self) -> C {
-        bincode::deserialize(&self.content).unwrap()
+        serde_json::from_slice(&self.content).unwrap()
     }
 }
 
@@ -108,7 +116,32 @@ pub enum Tag {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum File {
-    Markdown(MarkdownFile<serde_json::Value, Vec<u8>>),
+    Markdown(MarkdownFile<Vec<u8>, Vec<u8>>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl File {
+    pub async fn read<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let path = path.as_ref();
+        if path.is_dir() {
+            panic!("Trying read dir")
+        }
+        match path.extension().unwrap().to_str().unwrap() {
+            "md" => {
+                let file = tokio::fs::read_to_string(path).await.unwrap();
+                let options = pulldown_cmark::Options::all();
+                let parser = pulldown_cmark::Parser::new_ext(&file, options);
+                let events: Vec<pulldown_cmark::Event<'_>> = parser.collect();
+                Ok(File::Markdown(MarkdownFile {
+                    frontmatter: Default::default(),
+                    content: serde_json::to_vec(&events).unwrap(),
+                }))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,13 +166,22 @@ pub struct Task {
     meta: Option<HashMap<String, String>>,
 }
 
+impl Task {
+    pub fn new(text: String) -> Self {
+        Self {
+            title: text,
+            completed: false,
+            due: None,
+            meta: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Entity {
     Task(Task),
     Event,
-    Note,
-    Reminder,
-    Habit,
+    // Reminder,
 }
 
 #[derive(Debug, Serialize, Deserialize, thiserror::Error)]
@@ -148,6 +190,8 @@ pub enum Error {
     Serde(#[from] serde_error::Error),
     #[error("a render was requested but cannot be completed")]
     InvalidRender,
+    #[error("parse sql error")]
+    SqlParser,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,40 +215,15 @@ pub enum ViewType {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Default)]
+#[derive(xtra::Actor)]
 pub struct GlobalContext {
-    listeners: HashMap<String, Vec<BackendPlugin>>,
-    // views: HashMap<ViewType, String>,
-    // plugins: HashMap<String, BackendPlugin>,
+    database: Arc<Mutex<Glue<KasukuDatabase>>>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl GlobalContext {
-    pub fn new() -> Self {
-        GlobalContext {
-            // plugins: HashMap::new(),
-            listeners: HashMap::new(),
-            // views: HashMap::new(),
-        }
-    }
-
-    pub fn add_listener(&mut self, event: Event, plugin: BackendPlugin) {
-        // If the event already has listeners, append the plugin to the existing vector.
-        // Otherwise, create a new vector with the plugin and insert it into the hashmap.
-        self.listeners
-            .entry(event.path)
-            .or_insert_with(Vec::new)
-            .push(plugin);
-    }
-
-    pub fn remove_listener(&mut self, event: &Event, _plugin: &BackendPlugin) {
-        if let Some(event_listeners) = self.listeners.get_mut(&event.path) {
-            // event_listeners.retain(|p| p != plugin);
-            // Optionally, remove the event entry from the hashmap if its listeners vector is empty.
-            if event_listeners.is_empty() {
-                self.listeners.remove(&event.path);
-            }
-        }
+    pub fn new(database: Arc<Mutex<Glue<KasukuDatabase>>>) -> Self {
+        GlobalContext { database }
     }
 }
 
@@ -224,14 +243,29 @@ impl Fetcher {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Emitter;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Subscription {
+    event: String,
+    event_type: String,
+    data: String,
+}
+
 #[plugy::macros::context(data = BackendPlugin)]
 impl Emitter {
     pub async fn subscribe(
-        _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
-        data: String,
-    ) -> String {
-        println!("{data}");
-        data
+        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        subscription: crate::Subscription,
+    ) -> Result<String, ()> {
+        let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
+        let plugin = &caller.data().as_ref().unwrap().plugin.name;
+        let Subscription {
+            event,
+            event_type,
+            data,
+        } = subscription;
+        let sql =
+            format!("INSERT INTO subscriptions(plugin, event, event_type, data) VALUES('{plugin}','{event}','{event_type}','{data}');");
+        addr.send(Query(sql)).await.map_err(|_| ())
     }
 
     pub async fn emit(
@@ -239,6 +273,19 @@ impl Emitter {
         url: String,
     ) -> String {
         url
+    }
+}
+
+pub struct Database;
+
+#[plugy::macros::context(data = BackendPlugin)]
+impl Database {
+    pub async fn query(
+        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        sql: String,
+    ) -> String {
+        let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
+        addr.send(Query(sql)).await.unwrap()
     }
 }
 
@@ -333,18 +380,43 @@ impl Context {
         todo!()
     }
 
-    pub fn subscribe<E: PluginEvent + Serialize>(&mut self, event: &E) {
-        emitter::sync::Emitter::subscribe(serde_json::to_string_pretty(event).unwrap());
+    pub fn subscribe<E: PluginEvent + Serialize>(&mut self, event: &E) -> Result<(), String> {
+        let value = serde_json::to_value(event).unwrap();
+        let raw_event_type: Vec<&str> = value["type"].as_str().unwrap().split("::").collect();
+        let event = raw_event_type.first().unwrap().to_string();
+        let event_type = raw_event_type.get(1).unwrap().to_string();
+        let data = serde_json::to_string(&value).unwrap();
+        emitter::sync::Emitter::subscribe(Subscription {
+            data,
+            event,
+            event_type,
+        })
+        .unwrap();
+        Ok(())
     }
 
-    // fn query(&self, sql: &str) -> Vec<u8> {
-    //     let res = database::sync::Database::query(sql.to_owned());
-    //     res
-    // }
-}
+    pub fn query(&self, sql: &str) -> String {
+        let req = parse(sql).unwrap();
+        if req
+            .iter()
+            .any(|r| !matches!(r, sqlparser::ast::Statement::Query(_)))
+        {
+            panic!("Tried to modify database in non-mutable context. Please use execute()")
+        }
+        let res = database::sync::Database::query(sql.to_owned());
+        serde_json::to_string(&res).unwrap()
+    }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Intercept;
+    pub fn execute(&mut self, sql: &str) -> String {
+        let res = database::sync::Database::query(sql.to_owned());
+        serde_json::to_string(&res).unwrap()
+    }
+
+    pub fn add_task(&self, task: &Task) {
+        let text = &task.title;
+        database::sync::Database::query(format!("INSERT INTO tasks(text) VALUES ('{text}') "));
+    }
+}
 
 #[allow(unused_variables)]
 #[plugy::macros::plugin]
@@ -403,29 +475,23 @@ pub trait PluginEvent {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub type Addr = Address<PluginContext>;
+pub type Addr = Address<GlobalContext>;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(xtra::Actor)]
-pub struct PluginContext {
-    pub inner: GlobalContext,
+struct Query(String);
+
+#[cfg(not(target_arch = "wasm32"))]
+#[async_trait]
+impl Handler<Query> for GlobalContext {
+    type Return = String;
+
+    async fn handle(&mut self, sql: Query, _ctx: &mut xtra::Context<Self>) -> String {
+        let conn = &mut self.database;
+        let mut res = conn.lock().unwrap();
+        let res = res.execute(sql.0).unwrap();
+        serde_json::to_string(&res).unwrap()
+    }
 }
-
-// struct Query(String);
-
-// #[async_trait]
-// impl Handler<Query> for PluginContext {
-//     type Return = Vec<Payload>;
-
-//     async fn handle(&mut self, sql: Query, _ctx: &mut xtra::Context<Self>) -> Vec<Rows> {
-//         let conn = &mut self.connection;
-//         conn.call(|conn| {
-//             let mut stmt = conn.prepare("SELECT id, name, data FROM person").unwrap();
-//             Ok(stmt.query([]).unwrap())
-//         })
-//         .await
-//     }
-// }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
@@ -506,4 +572,10 @@ async fn pull_wasm(client: &mut Client, reference: &Reference) -> Vec<u8> {
         .expect("No data found");
     println!("Annotations: {:?}", image_content.annotations);
     image_content.data
+}
+
+const DIALECT: PostgreSqlDialect = PostgreSqlDialect {};
+
+pub fn parse<Sql: AsRef<str>>(sql: Sql) -> Result<Vec<Statement>, Error> {
+    Parser::parse_sql(&DIALECT, sql.as_ref()).map_err(|_e| Error::SqlParser)
 }
