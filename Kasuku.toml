@@ -10,7 +10,7 @@ file_types = ["md"]
 # entertainment = { plugins = ["files", "spotify", "audible"], mount = "./Media" }
 
 [plugins]
-tasks = { uri = "localhost:5000/tasks:v8", config = "checkbox" }
+tasks = { uri = "localhost:5000/tasks:v9", config = "checkbox" }
 # notes = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/notes" }
 # fitness = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/fitness" }
 # finance = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/finance" }

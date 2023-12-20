@@ -1,0 +1,30 @@
+[package]
+name = "context"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["backend"]
+backend = ["tokio", "xtra", "async-trait", "kasuku-database", "distribution"]
+
+[dependencies]
+anyhow = "1"
+types = { path = "../../core/types" }
+distribution = { path = "../distribution", optional = true }
+xtra = { git = "https://github.com/Restioson/xtra", features = [
+    "tokio",
+    "macros",
+], optional = true }
+async-trait = { version = "0.1", optional = true }
+tokio = { version = "1", features = ["full"], optional = true }
+kasuku-database = { path = "../database", optional = true }
+serde = "1"
+bincode = "1"
+plugy = { version = "0.3.1" }
+serde-json-wasm = "1"
+gluesql-core = { version = "0.14.0", default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+plugy = { version = "0.3.1", default-features = false, features = ["runtime"] }
+sqlparser = "0.30"

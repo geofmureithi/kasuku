@@ -378,11 +378,16 @@ dependencies = [
  "async-walkdir",
  "axum",
  "bincode",
+ "context",
+ "distribution",
  "figment",
  "futures",
  "heck",
  "hirola",
+ "interface",
  "kasuku-database",
+ "markdown",
+ "node",
  "notify",
  "plugy",
  "pulldown-cmark",
@@ -640,6 +645,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d16048cd947b08fa32c24458a22f5dc5e835264f689f4f5653210c69fd107363"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "context"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "distribution",
+ "gluesql-core",
+ "kasuku-database",
+ "plugy",
+ "serde",
+ "serde-json-wasm",
+ "sqlparser",
+ "tokio",
+ "types",
+ "xtra",
 ]
 
 [[package]]
@@ -911,6 +935,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 
 [[package]]
+name = "dataview"
+version = "0.1.0"
+
+[[package]]
 name = "debugid"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -978,6 +1006,13 @@ name = "discard"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
+
+[[package]]
+name = "distribution"
+version = "0.1.0"
+dependencies = [
+ "oci-distribution",
+]
 
 [[package]]
 name = "either"
@@ -1811,6 +1846,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "interface"
+version = "0.1.0"
+dependencies = [
+ "context",
+ "node",
+ "plugy",
+ "types",
+]
+
+[[package]]
 name = "io-lifetimes"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1917,6 +1962,7 @@ dependencies = [
  "gluesql-core",
  "serde",
  "serde_json",
+ "sqlparser",
  "tokio",
 ]
 
@@ -1993,6 +2039,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "markdown"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "pulldown-cmark",
+ "serde",
+ "tokio",
+ "types",
 ]
 
 [[package]]
@@ -2095,6 +2152,18 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
+]
+
+[[package]]
+name = "node"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "hirola",
+ "plugy",
+ "serde",
+ "serde-json-wasm",
+ "types",
 ]
 
 [[package]]
@@ -3036,10 +3105,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-error"
-version = "0.1.2"
+name = "serde-json-wasm"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e988182713aeed6a619a88bca186f6d6407483485ffe44c869ee264f8eabd13f"
+checksum = "83c37d03f3b0f6b5f77c11af1e7c772de1c9af83e50bef7bb6069601900ba67b"
 dependencies = [
  "serde",
 ]
@@ -3206,12 +3275,6 @@ dependencies = [
  "libc",
  "windows-sys 0.48.0",
 ]
-
-[[package]]
-name = "solvent"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14a50198e546f29eb0a4f977763c8277ec2184b801923c3be71eeaec05471f16"
 
 [[package]]
 name = "spin"
@@ -3392,7 +3455,11 @@ checksum = "14c39fd04924ca3a864207c66fc2cd7d22d7c016007f9ce846cbb9326331930a"
 name = "tasks"
 version = "0.1.0"
 dependencies = [
+ "context",
  "hirola",
+ "interface",
+ "markdown",
+ "node",
  "plugy",
  "serde",
  "serde_json",
@@ -3412,6 +3479,10 @@ dependencies = [
  "rustix 0.38.26",
  "windows-sys 0.48.0",
 ]
+
+[[package]]
+name = "template"
+version = "0.1.0"
 
 [[package]]
 name = "thiserror"
@@ -3758,23 +3829,8 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 name = "types"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "hirola",
- "kasuku-database",
- "oci-distribution",
- "plugy",
- "pulldown-cmark",
  "serde",
- "serde-error",
- "serde_json",
- "solvent",
- "sqlparser",
  "thiserror",
- "tokio",
- "url",
- "xtra",
 ]
 
 [[package]]
@@ -3855,7 +3911,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]
