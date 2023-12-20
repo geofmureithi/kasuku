@@ -28,9 +28,6 @@ impl PluginEvent for TaskEvent {
     type Plugin = Tasks;
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-enum Noop {}
-
 #[plugin_impl]
 impl Plugin for Tasks {
     fn on_load(&self, ctx: &mut Context) -> Result<(), Error> {

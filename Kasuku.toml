@@ -3,14 +3,15 @@ cache-path = "/tmp/kasuku-cache"
 
 [vaults.planning]
 label = "Planning"
-plugins = ["tasks"]
+plugins = ["tasks", "dataview"]
 mount = "/home/geoff/Documents/kasuku"
 file_types = ["md"]
 # budget = { plugins = ["tasks", "finance", "schedule"], mount = "./Bills" }
 # entertainment = { plugins = ["files", "spotify", "audible"], mount = "./Media" }
 
 [plugins]
-tasks = { uri = "localhost:5000/tasks:v9", config = "checkbox" }
+# tasks = { uri = "localhost:5000/tasks:v9", config = "checkbox" }
+dataview = { uri = "localhost:5000/dataview:v1", config = "checkbox" }
 # notes = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/notes" }
 # fitness = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/fitness" }
 # finance = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/finance" }

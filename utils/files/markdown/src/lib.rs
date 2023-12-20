@@ -10,6 +10,10 @@ use types::FileType;
 use types::IdentityPlugin;
 use types::PluginEvent;
 
+pub mod cmark {
+    pub use pulldown_cmark::*;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarkdownFile<'a> {
     #[serde(borrow)]
@@ -27,6 +31,10 @@ pub fn parse(content: &str) -> Result<MarkdownFile<'_>, types::Error> {
 impl<'a> MarkdownFile<'a> {
     pub fn get_contents(&'a self) -> &Vec<Event<'a>> {
         &self.events
+    }
+
+    pub fn get_contents_mut(&'a mut self) -> &mut Vec<Event<'a>> {
+        &mut self.events
     }
 }
 pub type Regex = String;

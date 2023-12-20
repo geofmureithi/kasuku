@@ -1,3 +1,5 @@
+mod payload;
+
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{any::type_name, fmt, marker::PhantomData};
 
@@ -19,10 +21,10 @@ pub struct Query(String);
 pub use backend::GlobalContext;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-
+#[repr(C)]
 pub enum ContextState {
-    Ref,
-    RefMut,
+    Ref = 1,
+    RefMut = 2,
 }
 
 #[cfg(feature = "backend")]
@@ -30,14 +32,11 @@ mod backend {
     use std::sync::{Arc, Mutex};
 
     use async_trait::async_trait;
-    use kasuku_database::{
-        prelude::{Glue, Payload},
-        KasukuDatabase,
-    };
+    use kasuku_database::{prelude::Glue, KasukuDatabase};
     use plugy::core::PluginLoader;
     use xtra::Handler;
 
-    use crate::{BackendPlugin, Query};
+    use crate::{payload::Payload, BackendPlugin, Query};
 
     impl From<BackendPlugin> for plugy::runtime::Plugin<BackendPlugin> {
         fn from(val: BackendPlugin) -> Self {
@@ -74,7 +73,7 @@ mod backend {
         ) -> Result<Vec<Payload>, kasuku_database::prelude::Error> {
             let conn = &mut self.database;
             let mut res = conn.lock().unwrap();
-            res.execute(sql.0)
+            Ok(res.execute(sql.0)?.into_iter().map(Into::into).collect())
         }
     }
 
@@ -119,7 +118,7 @@ impl Emitter {
     pub async fn subscribe(
         caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         subscription: crate::Subscription,
-    ) -> Result<Vec<gluesql_core::prelude::Payload>, types::Error> {
+    ) -> Result<Vec<crate::payload::Payload>, types::Error> {
         let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
         let plugin = &caller.data().as_ref().unwrap().plugin.name;
         let Subscription {
@@ -151,7 +150,7 @@ impl Database {
         caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         sql: String,
         ctx_state: crate::ContextState,
-    ) -> Result<Vec<gluesql_core::prelude::Payload>, types::Error> {
+    ) -> Result<Vec<crate::payload::Payload>, types::Error> {
         use kasuku_database::prelude::parse;
         if let ContextState::Ref = ctx_state {
             let req = parse(&sql).map_err(|e| Error::DatabaseError(e.to_string()))?;
@@ -166,10 +165,14 @@ impl Database {
             }
         }
         let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
-        addr.send(Query(sql))
+        Ok(addr
+            .send(Query(sql))
             .await
             .map_err(|e| Error::PluginError(e.to_string()))?
-            .map_err(|e| Error::DatabaseError(e.to_string()))
+            .map_err(|e| Error::DatabaseError(e.to_string()))?
+            .into_iter()
+            .map(Into::into)
+            .collect())
     }
 }
 
@@ -191,12 +194,12 @@ impl Context {
         Ok(())
     }
 
-    pub fn query(&self, sql: &str) -> Result<Vec<gluesql_core::prelude::Payload>, Error> {
+    pub fn query(&self, sql: &str) -> Result<Vec<crate::payload::Payload>, Error> {
         let res = database::sync::Database::query(sql.to_owned(), ContextState::Ref)?;
         Ok(res)
     }
 
-    pub fn execute(&mut self, sql: &str) -> Result<Vec<gluesql_core::prelude::Payload>, Error> {
+    pub fn execute(&mut self, sql: &str) -> Result<Vec<crate::payload::Payload>, Error> {
         let res = database::sync::Database::query(sql.to_owned(), ContextState::RefMut)?;
         Ok(res)
     }

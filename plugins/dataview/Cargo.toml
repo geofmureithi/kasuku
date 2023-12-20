@@ -3,6 +3,13 @@ name = "dataview"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
+plugy = { version = "0.3.1" }
+types = { path = "../../core/types" }
+interface = { path = "../../core/interface" }
+markdown = { path = "../../utils/files/markdown", default-features = false}
+context = { path = "../../utils/context", default-features = false}
+serde = { version = "1", features = ["derive"] }
