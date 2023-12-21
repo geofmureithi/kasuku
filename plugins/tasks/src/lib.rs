@@ -1,14 +1,13 @@
 mod card;
 
-use card::TaskCard;
 use context::Context;
 use hirola::prelude::*;
 use interface::Plugin;
-use markdown::{AsMarkdown, CodeBlockKind, LinkType, MarkdownEvent, Tag};
-use node::emit;
+use macros::FromSelect;
+use markdown::{AsMarkdown, MarkdownEvent};
 use plugy::macros::plugin_impl;
 use serde::{Deserialize, Serialize};
-use types::{Error, Event, File, PluginEvent, Rsx, Task};
+use types::{Error, Event, File, PluginEvent, Rsx};
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Tasks;
@@ -28,41 +27,50 @@ impl PluginEvent for TaskEvent {
     type Plugin = Tasks;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, FromSelect)]
+pub struct Task {
+    title: String,
+    completed: bool,
+    source: Option<String>,
+}
+
+impl Task {
+    pub fn new(text: String) -> Self {
+        Self {
+            title: text,
+            completed: false,
+            source: None,
+        }
+    }
+}
+
 #[plugin_impl]
 impl Plugin for Tasks {
     fn on_load(&self, ctx: &mut Context) -> Result<(), Error> {
-        ctx.subscribe(&TaskEvent::Add).unwrap();
-        ctx.subscribe(&MarkdownEvent::Tag(Tag::Link(
-            Some(LinkType::Email),
-            Some("/gmail.com/".to_owned()),
-            None,
-        )))
-        .unwrap();
-        ctx.subscribe(&MarkdownEvent::Tag(Tag::CodeBlock(CodeBlockKind::Fenced(
-            "rust".to_owned(),
-        ))))
-        .unwrap();
-        let _res: Vec<_> = ctx.execute(
+        ctx.subscribe(&TaskEvent::Add)?;
+        ctx.subscribe(&MarkdownEvent::TaskList)?;
+        ctx.execute(
             "CREATE TABLE IF NOT EXISTS tasks (
-                text TEXT NOT NULL,
-                completed INTEGER NOT NULL DEFAULT 0,
-                due INTEGER,
-                meta TEXT
+                title TEXT NOT NULL,
+                completed BOOLEAN NOT NULL,
+                source TEXT UNIQUE,
+                due DATE,
             );",
         )?;
         Ok(())
     }
 
-    fn process_file(&self, ctx: &Context, file: File) -> Result<File, Error> {
+    fn process_file(&self, ctx: &mut Context, file: File) -> Result<File, Error> {
+        let path = &file.path;
         let md = file.data.to_markdown()?;
 
         let events = md.get_contents();
 
         for (index, event) in events.iter().enumerate() {
-            if let markdown::Event::TaskListMarker(_state) = event {
+            if let markdown::Event::TaskListMarker(state) = event {
                 let next = events.get(index + 1);
                 if let Some(markdown::Event::Text(text)) = next {
-                    ctx.add_task(&Task::new(text.to_string()))?;
+                    ctx.execute(&format!("INSERT INTO tasks(title, completed, source) VALUES('{text}', {state}, '{path}:{index}')"))?;
                 }
             }
         }
@@ -75,14 +83,27 @@ impl Plugin for Tasks {
     }
 
     fn render(&self, ctx: &Context, _ev: Event) -> Result<Rsx, Error> {
-        let _res: Vec<_> = ctx.query("Select * from tasks")?;
-        html! {
+        let tasks: Vec<Task> = ctx
+            .query("Select * from tasks")?
+            .first()
+            .cloned()
+            .map(|payload| payload.try_into().unwrap())
+            .unwrap();
+        let len = tasks.len();
+        let node: node::Node = html! {
             <>
-                <task-card on:click=emit(&TaskEvent::Add)/>
-                <script src="https://unpkg.com/mathlive"></script>
-                <TaskCard />
+            <p>{format!("{len} tasks found")}</p>
+            <ul>
+                {
+                    for task in tasks {
+                        html! {
+                            <li data-completed={task.completed} data-source={task.source.unwrap_or("none".to_string())}>{task.title}</li>
+                        }
+                    }
+                }
+            </ul>
             </>
-        }
-        .try_into()
+        };
+        node.try_into()
     }
 }

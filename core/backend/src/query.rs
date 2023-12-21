@@ -68,17 +68,24 @@ impl QueryRoot {
                         _ => unreachable!(),
                     })
                     .collect();
-                let plugin: PluginWrapper<BackendPlugin, _> =
+                let tasks: PluginWrapper<BackendPlugin, _> =
+                    runtime.get_plugin_by_name("tasks").unwrap();
+                let dataview: PluginWrapper<BackendPlugin, _> =
                     runtime.get_plugin_by_name("dataview").unwrap();
                 let mut md = {
-                    let md = tokio::fs::read_to_string(path).await.unwrap();
+                    let md = tokio::fs::read_to_string(&path).await.unwrap();
+
                     let events = markdown::parse(&md).unwrap();
                     ::types::File {
                         data: ::types::FileType::Markdown(bincode::serialize(&events).unwrap()),
-                        ..Default::default()
+                        path,
                     }
                 };
-                md = plugin
+                md = tasks
+                    .process_file(::context::Context::acquire(), md)
+                    .await
+                    .unwrap();
+                md = dataview
                     .process_file(::context::Context::acquire(), md)
                     .await
                     .unwrap();
@@ -90,7 +97,7 @@ impl QueryRoot {
             _ => unreachable!(),
         };
 
-        let plugin: PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name("dataview").unwrap();
+        let plugin: PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name("tasks").unwrap();
         let res = plugin
             .render(
                 ::context::Context::acquire(),

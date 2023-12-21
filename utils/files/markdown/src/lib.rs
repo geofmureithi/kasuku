@@ -114,13 +114,13 @@ pub enum Tag {
 
 pub trait AsMarkdown {
     fn to_markdown<'a: 'de, 'de>(&'a self) -> Result<MarkdownFile<'de>, Error>;
-    fn to_file(file: MarkdownFile<'_>) -> Result<File, Error>;
+    fn to_file(file: MarkdownFile<'_>, path: String) -> Result<File, Error>;
 }
 
 impl AsMarkdown for FileType {
-    fn to_file(file: MarkdownFile<'_>) -> Result<File, Error> {
+    fn to_file(file: MarkdownFile<'_>, path: String) -> Result<File, Error> {
         Ok(File {
-            path: None,
+            path,
             data: FileType::Markdown(
                 bincode::serialize(&file).map_err(|e| Error::FileCodec(e.to_string()))?,
             ),

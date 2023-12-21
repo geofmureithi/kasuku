@@ -10,8 +10,8 @@ use axum::{
     routing::get,
     Extension, Json, Router,
 };
-use context::{BackendPlugin, Database, Emitter, Fetcher, GlobalContext, Context};
-use interface::{PluginWrapper, Plugin};
+use context::{BackendPlugin, Context, Database, Debugger, Emitter, Fetcher, GlobalContext, Query};
+use interface::{Plugin, PluginWrapper};
 use kasuku_database::{prelude::Glue, KasukuDatabase};
 use plugy::runtime::Runtime;
 
@@ -62,10 +62,10 @@ impl KasukuRuntime {
             .await;
         let mut db = Glue::new(ks);
         db.execute(
-            "
-                DROP TABLE IF EXISTS subscriptions;
+            "   DROP TABLE IF EXISTS subscriptions;
                 DROP TABLE IF EXISTS vaults;
                 DROP TABLE IF EXISTS entries;
+                DROP TABLE IF EXISTS tasks;
                 CREATE TABLE IF NOT EXISTS subscriptions (
                     plugin TEXT NOT NULL,
                     event TEXT NOT NULL,
@@ -86,65 +86,77 @@ impl KasukuRuntime {
         .unwrap();
 
         let db = Arc::new(Mutex::new(db));
+        let ctx_actor = xtra::spawn_tokio(GlobalContext::new(db.clone()), Mailbox::bounded(100));
         let runtime = Runtime::new().unwrap();
-        let runtime = runtime.context(Fetcher).context(Emitter).context(Database);
+        let runtime = runtime
+            .context(Fetcher)
+            .context(Emitter)
+            .context(Database)
+            .context(Debugger);
         for plugin in &config.plugins {
             let plugin: PluginWrapper<BackendPlugin, _> = runtime
                 .load_with(BackendPlugin {
-                    addr: xtra::spawn_tokio(GlobalContext::new(db.clone()), Mailbox::bounded(100)),
+                    addr: ctx_actor.clone(),
                     name: plugin.name.clone(),
                     uri: plugin.uri.clone(),
+                    meta: distribution::load_package(&plugin.uri).await,
                 })
                 .await
                 .unwrap();
             plugin.on_load(Context::acquire()).await.unwrap();
         }
 
+        let act = ctx_actor.clone();
+        let mv_act = ctx_actor.clone();
         for (vault, vault_config) in config.vaults.clone() {
             let mount = vault_config.mount.clone();
-            // let db_clone = Arc::clone(&db);
-            let _res = db.lock().as_mut().unwrap().execute(format!(
-                "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}') ON CONFLICT(name) DO 
-                         UPDATE SET mount = EXCLUDED.mount",
-                mount.to_str().unwrap()
-            ));
-
-            // tokio::spawn(async move {
-            use futures::stream::StreamExt;
-            let mut entries = WalkDir::new(mount).filter(|entry| async move {
-                if let Some(true) = entry
-                    .path()
-                    .file_name()
-                    .map(|f| f.to_string_lossy().starts_with('.'))
-                {
-                    return Filtering::IgnoreDir;
+            let _res = act
+                .send(Query(format!(
+                    "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}')",
+                    mount.to_str().unwrap()
+                )))
+                .await
+                .unwrap();
+            let mv_act = mv_act.clone();
+            tokio::spawn(async move {
+                use futures::stream::StreamExt;
+                let mut entries = WalkDir::new(mount).filter(|entry| async move {
+                    if let Some(true) = entry
+                        .path()
+                        .file_name()
+                        .map(|f| f.to_string_lossy().starts_with('.'))
+                    {
+                        return Filtering::IgnoreDir;
+                    }
+                    if let Some(true) = entry
+                        .path()
+                        .file_name()
+                        .map(|f| f.to_string_lossy().ends_with(".md"))
+                    {
+                        return Filtering::Continue;
+                    }
+                    Filtering::Ignore
+                });
+                let mv_act = mv_act.clone();
+                loop {
+                    match entries.next().await {
+                        Some(Ok(entry)) => {
+                            let _res = mv_act
+                                .send(Query(format!(
+                                    "INSERT INTO entries(path, vault) VALUES('{}', '{}')",
+                                    entry.path().display(),
+                                    vault
+                                )))
+                                .await;
+                        }
+                        Some(Err(e)) => {
+                            eprintln!("error: {}", e);
+                            break;
+                        }
+                        None => break,
+                    }
                 }
-                if let Some(true) = entry
-                    .path()
-                    .file_name()
-                    .map(|f| f.to_string_lossy().ends_with(".md"))
-                {
-                    return Filtering::Continue;
-                }
-                Filtering::Ignore
             });
-            loop {
-                match entries.next().await {
-                    Some(Ok(entry)) => {
-                        let _res = db.lock().unwrap().execute(format!(
-                            "INSERT INTO entries(path, vault) VALUES('{}', '{}')",
-                            entry.path().display(),
-                            vault
-                        ));
-                    }
-                    Some(Err(e)) => {
-                        eprintln!("error: {}", e);
-                        break;
-                    }
-                    None => break,
-                }
-            }
-            // });
         }
         KasukuRuntime {
             inner: Arc::new(runtime),
@@ -193,28 +205,6 @@ pub async fn app<D: Send + Sync + Clone + 'static>(port: u16, data: D) {
         .await
         .unwrap();
 }
-
-// async fn getter(
-//     state: Extension<KasukuRuntime>,
-//     Path((_module, plugin, _path)): Path<(String, String, String)>,
-// ) -> impl IntoResponse {
-//     let plugin = state.get_plugin_by_name(&plugin).unwrap();
-//     let res = plugin.render(RenderEvent::default()).await;
-//     Json(serde_json::from_slice::<serde_json::Value>(&res.0).unwrap())
-// }
-
-// async fn do_action(
-//     state: Extension<KasukuRuntime>,
-//     Path((_module, plugin, _path)): Path<(String, String, String)>,
-//     Json(data): Json<serde_json::Value>,
-// ) -> impl IntoResponse {
-//     let plugin = state.get_plugin_by_name(&plugin).unwrap();
-//     let _res = plugin
-//         .handle(FileEvent::CustomAction(serde_json::to_vec(&data).unwrap()))
-//         .await
-//         .unwrap();
-//     Html("res")
-// }
 
 async fn get_config(state: Extension<KasukuRuntime>) -> impl IntoResponse {
     // let dom = Dom::new();

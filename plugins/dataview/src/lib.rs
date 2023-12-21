@@ -1,14 +1,14 @@
 use context::Context;
 use interface::Plugin;
-use markdown::{cmark::CowStr, AsMarkdown, CodeBlockKind, MarkdownEvent, Tag, MarkdownFile};
+use markdown::{cmark::CowStr, AsMarkdown, CodeBlockKind, MarkdownEvent, MarkdownFile, Tag};
 use plugy::macros::plugin_impl;
 use serde::Deserialize;
-use types::{Error, File, FileType, Task};
+use types::{Error, File, FileType};
 
 #[derive(Debug, Deserialize, Default)]
 pub struct DataView;
 
-enum DisplayType {
+pub enum DisplayType {
     List,
     Tasks,
     Table,
@@ -23,7 +23,7 @@ impl Plugin for DataView {
         Ok(())
     }
 
-    fn process_file(&self, ctx: &Context, file: File) -> Result<File, Error> {
+    fn process_file(&self, ctx: &mut Context, file: File) -> Result<File, Error> {
         let mut md = file.data.to_markdown()?;
 
         let events = md.get_contents_mut();
@@ -33,18 +33,22 @@ impl Plugin for DataView {
                 markdown::cmark::CodeBlockKind::Fenced(tag),
             )) = event
             {
-                if (tag.contains("dataview")) {
+                if tag.contains("dataview") {
                     let next = events.get_mut(index + 1);
                     if let Some(markdown::Event::Text(ref mut text)) = next {
                         let res = ctx.query(&text)?;
-                        *text = CowStr::Borrowed("Data goes here");
+                        let txt = format!("{res:?}");
+                        *text = CowStr::Borrowed(txt.leak());
                     }
                 }
             }
         }
-        let file = FileType::to_file(MarkdownFile {
-            events: events.to_vec()
-        })?;
+        let file = FileType::to_file(
+            MarkdownFile {
+                events: events.to_vec(),
+            },
+            file.path,
+        )?;
         Ok(file)
     }
 }

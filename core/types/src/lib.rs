@@ -1,7 +1,6 @@
 pub mod config;
 
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -23,25 +22,6 @@ pub enum Action {
     Main,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Task {
-    pub title: String,
-    completed: bool,
-    due: Option<String>,
-    meta: Option<HashMap<String, String>>,
-}
-
-impl Task {
-    pub fn new(text: String) -> Self {
-        Self {
-            title: text,
-            completed: false,
-            due: None,
-            meta: None,
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, thiserror::Error)]
 pub enum Error {
     #[error("ser/de failed: `{0}`")]
@@ -57,7 +37,7 @@ pub enum Error {
     #[error("A plugin error occurred `{0}`")]
     PluginError(String),
     #[error("A database error occurred `{0}`")]
-    DatabaseError(String)
+    DatabaseError(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -78,7 +58,7 @@ pub struct Rsx(pub String);
 /// A serializable version of a file
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct File {
-    pub path: Option<String>,
+    pub path: String,
     pub data: FileType, // The contents of the file serialized in bincode
 }
 

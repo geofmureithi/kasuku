@@ -61,7 +61,6 @@ where
 pub struct VaultConfig {
     pub mount: PathBuf,
     pub plugins: Vec<String>,
-    pub file_types: Vec<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

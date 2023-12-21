@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 oci-distribution = "0.9"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+serde = "1"
+figment = { version = "0.10", features = ["toml", "env"] }
+# wasm-opt = "0.116.0"

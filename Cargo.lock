@@ -1018,7 +1018,10 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 name = "distribution"
 version = "0.1.0"
 dependencies = [
+ "figment",
  "oci-distribution",
+ "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -2046,6 +2049,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.39",
 ]
 
 [[package]]
@@ -3424,6 +3435,7 @@ dependencies = [
  "context",
  "hirola",
  "interface",
+ "macros",
  "markdown",
  "node",
  "plugy",

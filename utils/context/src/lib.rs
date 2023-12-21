@@ -1,9 +1,12 @@
-mod payload;
+pub mod payload;
 
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{any::type_name, fmt, marker::PhantomData};
 
-use types::{Error, PluginEvent, Task, ViewType};
+use types::{Error, PluginEvent, ViewType};
+
+#[cfg(feature = "backend")]
+use distribution::PluginAnnotation;
 
 #[cfg(feature = "backend")]
 pub type Addr = xtra::Address<backend::GlobalContext>;
@@ -14,8 +17,10 @@ pub struct BackendPlugin {
     pub addr: Addr,
     pub name: String,
     pub uri: String,
+    #[cfg(feature = "backend")]
+    pub meta: PluginAnnotation,
 }
-pub struct Query(String);
+pub struct Query(pub String);
 
 #[cfg(feature = "backend")]
 pub use backend::GlobalContext;
@@ -56,9 +61,9 @@ mod backend {
             &self,
         ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<u8>, anyhow::Error>>>>
         {
-            let reference = self.uri.clone();
+            let data = self.meta.wasm.clone();
 
-            Box::pin(async move { Ok(distribution::load_package(&reference).await) })
+            Box::pin(async move { Ok(data) })
         }
     }
 
@@ -100,6 +105,18 @@ impl Fetcher {
         url: String,
     ) -> String {
         url
+    }
+}
+
+pub struct Debugger;
+
+#[plugy::macros::context(data = BackendPlugin)]
+impl Debugger {
+    pub async fn debug(
+        _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        output: String,
+    ) {
+        println!("{output}")
     }
 }
 
@@ -177,6 +194,9 @@ impl Database {
 }
 
 impl Context {
+    pub fn debug(&self, output: &str) {
+        debugger::sync::Debugger::debug(output.to_string());
+    }
     pub fn fetch(&self, url: &str) -> String {
         fetcher::sync::Fetcher::fetch(url.to_string())
     }
@@ -202,15 +222,6 @@ impl Context {
     pub fn execute(&mut self, sql: &str) -> Result<Vec<crate::payload::Payload>, Error> {
         let res = database::sync::Database::query(sql.to_owned(), ContextState::RefMut)?;
         Ok(res)
-    }
-
-    pub fn add_task(&self, task: &Task) -> Result<(), Error> {
-        let text = &task.title;
-        database::sync::Database::query(
-            format!("INSERT INTO tasks(text) VALUES ('{text}') "),
-            ContextState::RefMut,
-        )?;
-        Ok(())
     }
 }
 

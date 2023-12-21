@@ -1,35 +1,18 @@
 [internals]
 cache-path = "/tmp/kasuku-cache"
 
-[vaults.planning]
-label = "Planning"
-plugins = ["tasks", "dataview"]
-mount = "/home/geoff/Documents/kasuku"
-file_types = ["md"]
-# budget = { plugins = ["tasks", "finance", "schedule"], mount = "./Bills" }
-# entertainment = { plugins = ["files", "spotify", "audible"], mount = "./Media" }
+[vaults]
+planning = { plugins = ["tasks", "dataview"], mount = "/home/geoff/Documents/kasuku" }
 
 [plugins]
-# tasks = { uri = "localhost:5000/tasks:v9", config = "checkbox" }
-dataview = { uri = "localhost:5000/dataview:v1", config = "checkbox" }
-# notes = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/notes" }
-# fitness = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/fitness" }
-# finance = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/finance" }
-# files = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/files" }
-# schedule = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/schedule" }
-# growth = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/growth" }
-# password-manager = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/password-manager", headless = true }
-# encryption = { uri = "ghcr.io/geofmureithi/kasuku/@plugins/password-manager", headless = true }
-
-
-[web-components]
-button = ""
+tasks = { uri = "localhost:5000/tasks:0.1.0" }
+dataview = { uri = "localhost:5000/dataview:0.1.0", config = { tag = "dataview" } }
 
 
 [events]
 'cron::Daily' = [
-    "files::CleanUp",
-    "tasks::GenerateDaily",
+    "tasks::CleanUp",
+    "template::GenerateDaily",
     "fitness::TrackDaily",
 ]
 "tasks::TaskEvent::Delete" = ["growth::Cleanup"]

@@ -2,6 +2,7 @@
 name = "dataview"
 version = "0.1.0"
 edition = "2021"
+description = "A plugin that allows you to run sql queries against kasuku database"
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -10,6 +11,13 @@ crate-type = ["cdylib", "lib"]
 plugy = { version = "0.3.1" }
 types = { path = "../../core/types" }
 interface = { path = "../../core/interface" }
-markdown = { path = "../../utils/files/markdown", default-features = false}
-context = { path = "../../utils/context", default-features = false}
+markdown = { path = "../../utils/files/markdown", default-features = false }
+context = { path = "../../utils/context", default-features = false }
 serde = { version = "1", features = ["derive"] }
+
+# Metadata used in kasuku
+[package.metadata.kasuku]
+name = "io.kasuku.core.dataview"
+icon = "mdi-database-eye"
+readme = "https://github.com/geofmureithi/kasuku/tree/main/plugins/dataview"
+compatibility = "0.1"

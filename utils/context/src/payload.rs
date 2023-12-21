@@ -26,7 +26,7 @@ pub enum Value {
     Null,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Payload {
     ShowColumns(Vec<(String, DataType)>),
     Create,
@@ -77,7 +77,7 @@ pub enum DataType {
     Decimal,
     Point,
 }
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum PayloadVariable {
     Tables(Vec<String>),
     Functions(Vec<String>),
@@ -206,6 +206,162 @@ pub mod from_impl {
                     PayloadVariable::Version(version)
                 }
             }
+        }
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Bool(b) = value {
+            Ok(b)
+        } else {
+            Err(())
+        }
+    }
+}
+impl TryFrom<Value> for Option<bool> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let inner_value = value.try_into();
+        Ok(inner_value.ok())
+    }
+}
+
+impl TryFrom<Value> for i8 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::I8(i) = value {
+            Ok(i)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<Value> for Option<i8> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let inner_value = value.try_into();
+        Ok(inner_value.ok())
+    }
+}
+
+impl TryFrom<Value> for i16 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::I16(i) = value {
+            Ok(i)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<Value> for String {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Str(s) = value {
+            Ok(s)
+        } else {
+            Err(())
+        }
+    }
+}
+impl TryFrom<Value> for Option<String> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let inner_value = value.try_into();
+        Ok(inner_value.ok())
+    }
+}
+
+impl TryFrom<Value> for Vec<u8> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Bytea(b) = value {
+            Ok(b)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<Value> for IpAddr {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Inet(ip) = value {
+            Ok(ip)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<Value> for HashMap<String, Value> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Map(map) = value {
+            Ok(map)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<Value> for Vec<Value> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::List(list) = value {
+            Ok(list)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<Value> for (f64, f64) {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Point { x, y } = value {
+            Ok((x, y))
+        } else {
+            Err(())
+        }
+    }
+}
+
+pub struct Row(pub Vec<String>, pub Vec<Value>);
+
+impl<T: TryFrom<Row>> TryFrom<Payload> for Vec<T> {
+    type Error = types::Error;
+
+    fn try_from(payload: Payload) -> Result<Self, Self::Error> {
+        match payload {
+            Payload::Select { labels, rows } => {
+                let mut res = Vec::new();
+                for row in rows.into_iter() {
+                    res.push(T::try_from(Row(labels.clone(), row)).map_err(|_| {
+                        types::Error::DatabaseError("Could not find value".to_string())
+                    })?);
+                }
+                Ok(res)
+            }
+            _ => Err(types::Error::DatabaseError(
+                "invalid payload type".to_string(),
+            )),
         }
     }
 }

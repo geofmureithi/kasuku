@@ -6,7 +6,7 @@ use types::{Error, Event, File, IdentityPlugin, Rsx};
 pub trait Plugin: Send + Sync {
     fn on_load(&self, ctx: &mut Context) -> Result<(), Error>;
 
-    fn process_file(&self, ctx: &Context, file: File) -> Result<File, Error> {
+    fn process_file(&self, ctx: &mut Context, file: File) -> Result<File, Error> {
         Ok(file)
     }
 
