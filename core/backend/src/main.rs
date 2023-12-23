@@ -13,6 +13,8 @@ async fn main() {
         .extract()
         .unwrap();
     // config.validate().expect("Invalid config");
-    let runtime = KasukuRuntime::new(config).await;
+    let runtime = KasukuRuntime::new(config)
+        .await
+        .expect("Could not start the runtime");
     let _app = backend::app(3001, runtime).await;
 }

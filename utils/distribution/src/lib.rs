@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use oci_distribution::client::{Config, ImageLayer};
+use oci_distribution::client::{ImageLayer, PushResponse};
+use oci_distribution::errors::OciDistributionError;
 use oci_distribution::Client;
 use oci_distribution::{
     manifest::{self, OciManifest},
@@ -9,15 +10,47 @@ use oci_distribution::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Deserialize)]
+pub struct Package {
+    pub name: String,
+    // authors: Vec<String>,
+    pub description: String,
+    pub metadata: Meta,
+    pub version: String,
+    pub license: Option<String>,
+    pub repository: Option<String>,
+}
+#[derive(Deserialize)]
+pub struct Meta {
+    pub kasuku: Kasuku,
+}
+
+#[derive(Deserialize)]
+pub struct Kasuku {
+    pub name: String,
+    pub readme: String,
+    pub icon: String,
+    pub identifier: String,
+    pub dependencies: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+pub struct Config {
+    pub package: Package,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginAnnotation {
     pub name: String,
+    pub identifier: String,
     pub icon: String,
     pub description: String,
     pub version: String,
     pub readme: String,
     pub dependencies: Vec<String>,
     pub vendor: String,
+    pub licenses: Option<String>,
+    pub source: Option<String>,
     pub wasm: Vec<u8>,
 }
 
@@ -25,6 +58,7 @@ impl From<PluginAnnotation> for HashMap<String, String> {
     fn from(plugin: PluginAnnotation) -> Self {
         let mut hashmap = HashMap::new();
         hashmap.insert("org.opencontainers.image.title".to_string(), plugin.name);
+        hashmap.insert("io.kasuku.plugin.identifier".to_string(), plugin.identifier);
         hashmap.insert("io.kasuku.plugin.icon".to_string(), plugin.icon);
         hashmap.insert(
             "org.opencontainers.image.description".to_string(),
@@ -43,6 +77,20 @@ impl From<PluginAnnotation> for HashMap<String, String> {
             dependencies_str,
         );
         hashmap.insert("org.opencontainers.image.vendor".to_owned(), plugin.vendor);
+        if plugin.source.is_some() {
+            hashmap.insert(
+                "org.opencontainers.image.source".to_owned(),
+                plugin.source.unwrap(),
+            );
+        }
+
+        if plugin.licenses.is_some() {
+            hashmap.insert(
+                "org.opencontainers.image.licenses".to_owned(),
+                plugin.licenses.unwrap(),
+            );
+        }
+
         hashmap
     }
 }
@@ -57,6 +105,10 @@ impl From<HashMap<String, String>> for PluginAnnotation {
             .get("io.kasuku.plugin.icon")
             .cloned()
             .unwrap_or_default();
+        let identifier = hashmap.get("io.kasuku.plugin.identifier").cloned().expect(
+            &("Invalid plugin config. Missing plugin identifier key `io.kasuku.plugin.identifier` in "
+                .to_owned() + &name),
+        );
         let description = hashmap
             .get("org.opencontainers.image.description")
             .cloned()
@@ -74,6 +126,9 @@ impl From<HashMap<String, String>> for PluginAnnotation {
             .get("org.opencontainers.image.vendor")
             .cloned()
             .unwrap_or_default();
+        let licenses = hashmap.get("org.opencontainers.image.licenses").cloned();
+
+        let source = hashmap.get("org.opencontainers.image.source").cloned();
 
         // Convert comma-separated String back to Vec<String>
         let dependencies = hashmap
@@ -83,12 +138,15 @@ impl From<HashMap<String, String>> for PluginAnnotation {
 
         PluginAnnotation {
             name,
+            identifier,
             icon,
             description,
             version,
             readme,
             dependencies,
             vendor,
+            licenses,
+            source,
             wasm: vec![],
         }
     }
@@ -102,36 +160,54 @@ pub struct PluginLock {
     version: String,
 }
 
-pub async fn load_package(reference: &str) -> PluginAnnotation {
+pub async fn load_package(reference: &str) -> Result<PluginAnnotation, OciDistributionError> {
     let mut client = Client::new(oci_distribution::client::ClientConfig {
         protocol: oci_distribution::client::ClientProtocol::Http,
         // accept_invalid_certificates: true,
         ..Default::default()
     });
-    let reference: Reference = reference.parse().expect("Not a valid image reference");
+    let reference: Reference = reference.parse().map_err(|e| {
+        OciDistributionError::ManifestParsingError(format!("Could not read the reference {e}"))
+    })?;
     let (_manifest, _) = client
         .pull_manifest(&reference, &RegistryAuth::Anonymous)
-        .await
-        .expect("Cannot pull manifest");
+        .await?;
     pull_wasm(&mut client, &reference).await
 }
 
 // Read the Plugin
-async fn pull_wasm(client: &mut Client, reference: &Reference) -> PluginAnnotation {
+pub async fn pull_wasm(
+    client: &mut Client,
+    reference: &Reference,
+) -> Result<PluginAnnotation, OciDistributionError> {
     let image_data = client
         .pull(
             reference,
             &RegistryAuth::Anonymous,
             vec![manifest::WASM_LAYER_MEDIA_TYPE],
         )
-        .await
-        .expect("Cannot pull Wasm module");
-    let layer = image_data.layers.into_iter().next().expect("No data found");
-    let manifest = image_data.manifest.unwrap().annotations.unwrap_or_default();
+        .await?;
+    let layer =
+        image_data
+            .layers
+            .into_iter()
+            .next()
+            .ok_or(OciDistributionError::ManifestParsingError(
+                "Could not find required layers".to_owned(),
+            ))?;
+    let manifest = image_data
+        .manifest
+        .ok_or(OciDistributionError::ManifestParsingError(
+            "Could not find required annotations".to_owned(),
+        ))?
+        .annotations
+        .ok_or(OciDistributionError::ManifestParsingError(
+            "Could not find required annotations".to_owned(),
+        ))?;
     let mut plugin: PluginAnnotation = manifest.into();
 
     plugin.wasm = layer.data;
-    plugin
+    Ok(plugin)
 }
 
 pub async fn push_wasm(
@@ -140,7 +216,7 @@ pub async fn push_wasm(
     reference: &Reference,
     module: &str,
     annotations: PluginAnnotation,
-) {
+) -> Result<PushResponse, OciDistributionError> {
     let data = tokio::fs::read(module)
         .await
         .expect("Cannot read Wasm module from disk");
@@ -151,7 +227,7 @@ pub async fn push_wasm(
         None,
     )];
 
-    let config = Config {
+    let config = oci_distribution::client::Config {
         data: b"{}".to_vec(),
         media_type: manifest::WASM_CONFIG_MEDIA_TYPE.to_string(),
         annotations: None,
@@ -160,11 +236,7 @@ pub async fn push_wasm(
     let image_manifest =
         manifest::OciImageManifest::build(&layers, &config, Some(annotations.into()));
 
-    let response = client
-        .push(&reference, &layers, config, &auth, Some(image_manifest))
+    client
+        .push(reference, &layers, config, auth, Some(image_manifest))
         .await
-        .map(|push_response| push_response.manifest_url)
-        .expect("Cannot push Wasm module");
-
-    println!("Wasm module successfully pushed {:?}", response);
 }

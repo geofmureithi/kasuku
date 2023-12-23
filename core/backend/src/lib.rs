@@ -46,23 +46,28 @@ impl Deref for KasukuRuntime {
 }
 
 impl KasukuRuntime {
-    pub async fn new(config: Config) -> Self {
+    pub async fn new(config: Config) -> Result<Self, types::Error> {
         use futures::FutureExt;
-        let ks = KasukuDatabase::open(&config.internals.database_path)
+        let kasuku_database = KasukuDatabase::open(&config.internals.database_path)
             .then(|res| async {
                 if res.is_err() {
                     let new_db = KasukuDatabase::new(&config.internals.database_path)
                         .await
-                        .unwrap();
-                    new_db.save().await.unwrap();
-                    return new_db;
+                        .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
+                    new_db
+                        .save()
+                        .await
+                        .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
+                    return Ok(new_db);
                 }
-                res.unwrap()
+                res.map_err(|err| types::Error::DatabaseError(err.to_string()))
             })
-            .await;
-        let mut db = Glue::new(ks);
-        db.execute(
-            "   DROP TABLE IF EXISTS subscriptions;
+            .await
+            .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
+        let mut glue_db = Glue::new(kasuku_database);
+        glue_db
+            .execute(
+                "   DROP TABLE IF EXISTS subscriptions;
                 DROP TABLE IF EXISTS vaults;
                 DROP TABLE IF EXISTS entries;
                 DROP TABLE IF EXISTS tasks;
@@ -82,10 +87,10 @@ impl KasukuRuntime {
                     last_modified INTEGER,
                     meta TEXT
                 )",
-        )
-        .unwrap();
+            )
+            .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
 
-        let db = Arc::new(Mutex::new(db));
+        let db = Arc::new(Mutex::new(glue_db));
         let ctx_actor = xtra::spawn_tokio(GlobalContext::new(db.clone()), Mailbox::bounded(100));
         let runtime = Runtime::new().unwrap();
         let runtime = runtime
@@ -99,11 +104,13 @@ impl KasukuRuntime {
                     addr: ctx_actor.clone(),
                     name: plugin.name.clone(),
                     uri: plugin.uri.clone(),
-                    meta: distribution::load_package(&plugin.uri).await,
+                    meta: distribution::load_package(&plugin.uri)
+                        .await
+                        .map_err(|err| types::Error::PluginError(err.to_string()))?,
                 })
                 .await
                 .unwrap();
-            plugin.on_load(Context::acquire()).await.unwrap();
+            plugin.on_load(Context::acquire()).await?;
         }
 
         let act = ctx_actor.clone();
@@ -113,10 +120,13 @@ impl KasukuRuntime {
             let _res = act
                 .send(Query(format!(
                     "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}')",
-                    mount.to_str().unwrap()
+                    mount.to_str().ok_or(types::Error::Serialization(
+                        "Invalid vault name".to_string()
+                    ))?
                 )))
                 .await
-                .unwrap();
+                .map_err(|err| types::Error::DatabaseError(err.to_string()))?
+                .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
             let mv_act = mv_act.clone();
             tokio::spawn(async move {
                 use futures::stream::StreamExt;
@@ -158,11 +168,11 @@ impl KasukuRuntime {
                 }
             });
         }
-        KasukuRuntime {
+        Ok(KasukuRuntime {
             inner: Arc::new(runtime),
             config,
             database: db,
-        }
+        })
     }
 }
 

@@ -36,7 +36,7 @@ impl Plugin for DataView {
                 if tag.contains("dataview") {
                     let next = events.get_mut(index + 1);
                     if let Some(markdown::Event::Text(ref mut text)) = next {
-                        let res = ctx.query(&text)?;
+                        let res = ctx.query(text)?;
                         let txt = format!("{res:?}");
                         *text = CowStr::Borrowed(txt.leak());
                     }

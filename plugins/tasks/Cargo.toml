@@ -3,6 +3,7 @@ name = "tasks"
 version = "0.1.0"
 edition = "2021"
 description = "A kasuku plugin for managing tasks in markdown files"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -23,7 +24,8 @@ serde_json = "1"
 
 # Metadata used in kasuku
 [package.metadata.kasuku]
-name = "io.kasuku.core.tasks"
+name = "Tasks"
+identifier = "io.kasuku.core.tasks"
 icon = "carbon-task"
 readme = "https://github.com/geofmureithi/kasuku/tree/main/plugins/tasks"
 compatibility = "0.1"

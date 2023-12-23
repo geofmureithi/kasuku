@@ -1,37 +1,9 @@
-use distribution::{push_wasm, PluginAnnotation};
-use oci_distribution::{secrets::RegistryAuth, Client};
-use serde::Deserialize;
-
+use distribution::{push_wasm, Config, PluginAnnotation};
 use figment::{
     providers::{Env, Format, Toml},
     Figment,
 };
-
-#[derive(Deserialize)]
-struct Package {
-    name: String,
-    // authors: Vec<String>,
-    description: String,
-    metadata: Meta,
-    version: String,
-}
-#[derive(Deserialize)]
-struct Meta {
-    kasuku: Kasuku,
-}
-
-#[derive(Deserialize)]
-struct Kasuku {
-    name: String,
-    readme: String,
-    icon: String,
-    // compatibility: String,
-}
-
-#[derive(Deserialize)]
-struct Config {
-    package: Package,
-}
+use oci_distribution::{secrets::RegistryAuth, Client};
 
 #[tokio::main]
 pub async fn main() {
@@ -60,14 +32,26 @@ pub async fn main() {
         description: config.package.description,
         version: config.package.version,
         vendor: "Kasuku Core".to_owned(),
-        ..Default::default()
+        identifier: config.package.metadata.kasuku.identifier,
+        licenses: config.package.license,
+        source: config.package.repository,
+        dependencies: config
+            .package
+            .metadata
+            .kasuku
+            .dependencies
+            .unwrap_or_default(),
+        wasm: vec![],
     };
-    push_wasm(
+    let res = push_wasm(
         &mut client,
         &RegistryAuth::Anonymous,
         &reference,
         &module,
         annotations,
     )
-    .await;
+    .await
+    .expect("Could not push plugin to oci registry");
+
+    println!("Image successfully pushed: Manifest: {}", res.manifest_url);
 }
