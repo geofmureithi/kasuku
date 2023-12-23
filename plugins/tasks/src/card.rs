@@ -1,5 +1,5 @@
 use hirola::prelude::*;
-use types::node::Node;
+use node::Node;
 
 #[component]
 pub fn TaskCard() -> Node {

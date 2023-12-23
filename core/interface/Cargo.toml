@@ -1,0 +1,15 @@
+[package]
+name = "interface"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+context = { path = "../../utils/context", default-features = false}
+node = { path = "../../utils/node" }       #features = sync
+plugy = { version = "0.3" }
+types = { path = "../types" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+context = { path = "../../utils/context", default-features = true}

@@ -1,31 +1,25 @@
 [package]
-name = "tasks"
+name = "dataview"
 version = "0.1.0"
 edition = "2021"
-description = "A kasuku plugin for managing tasks in markdown files"
+description = "A plugin that allows you to run sql queries against kasuku database"
 license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "lib"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 plugy = { version = "0.3.1" }
 types = { path = "../../core/types" }
 interface = { path = "../../core/interface" }
-macros = { path = "../../core/macros" }
 markdown = { path = "../../utils/files/markdown", default-features = false }
 context = { path = "../../utils/context", default-features = false }
-node = { path = "../../utils/node" }
 serde = { version = "1", features = ["derive"] }
-hirola = { version = "0.4.0-beta.0", default-features = false }
-serde_json = "1"
 
 # Metadata used in kasuku
 [package.metadata.kasuku]
-name = "Tasks"
-identifier = "io.kasuku.core.tasks"
-icon = "carbon-task"
-readme = "https://github.com/geofmureithi/kasuku/tree/main/plugins/tasks"
+name = "DataView"
+identifier = "io.kasuku.core.dataview"
+icon = "mdi-database-eye"
+readme = "https://github.com/geofmureithi/kasuku/tree/main/plugins/dataview"
 compatibility = "0.1"

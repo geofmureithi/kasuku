@@ -1,0 +1,13 @@
+[package]
+name = "distribution"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+oci-distribution = "0.9"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+serde = "1"
+figment = { version = "0.10", features = ["toml", "env"] }
+# wasm-opt = "0.116.0"

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kasuku</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@unocss/reset/tailwind.min.css">
+  <!-- define unocss options... -->
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-icons.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-wind.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-typography.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/preset-web-fonts.global.js"></script>
+
+  <link data-trunk rel="css" href="./static/defaults.css" />
+  <script>
+    window.__unocss = {
+      runtime: {
+        bypassDefined: true
+      },
+      presets: [
+        () => window.__unocss_runtime.presets.presetTypography(),
+        () => window.__unocss_runtime.presets.presetWind(),
+        () => window.__unocss_runtime.presets.presetIcons({
+          scale: 1.2,
+          cdn: 'https://esm.sh/'
+        }),
+        () => window.__unocss_runtime.presets.presetWebFonts({
+          provider: 'google', // default provider
+          fonts: {
+            // these will extend the default theme
+            sans: 'Roboto',
+            mono: ['Fira Code', 'Fira Mono:400,700'],
+            // custom ones
+            lobster: 'Lobster',
+            lato: [
+              {
+                name: 'Lato',
+                weights: ['400', '700'],
+                italic: true,
+              },
+              {
+                name: 'sans-serif',
+                provider: 'none',
+              },
+            ],
+          },
+        }),
+      ],
+    };
+    const script = document.createElement('script');
+    script.type = "text/javascript";
+    script.addEventListener("load", function (event) {
+      setTimeout(() => {
+        let wrapper = document.getElementById("loader-wrapper");
+        wrapper.remove();
+      }, 2000)
+
+    });
+    script.src = "https://cdn.jsdelivr.net/npm/@unocss/runtime/core.global.js";
+    document.getElementsByTagName('head')[0].appendChild(script);
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+  <script type="module">
+    import { Editor } from 'https://esm.sh/@tiptap/core'
+    import StarterKit from 'https://esm.sh/@tiptap/starter-kit'
+    import { Markdown } from 'https://esm.sh/tiptap-markdown'
+    import FloatingMenu from 'https://esm.sh/@tiptap/extension-floating-menu'
+    import BubbleMenu from 'https://esm.sh/@tiptap/extension-bubble-menu'
+    import TaskItem from 'https://esm.sh/@tiptap/extension-task-item'
+    import TaskList from 'https://esm.sh/@tiptap/extension-task-list'
+    import Table from 'https://esm.sh/@tiptap/extension-table'
+    import TableCell from 'https://esm.sh/@tiptap/extension-table-cell'
+    import TableHeader from 'https://esm.sh/@tiptap/extension-table-header'
+    import TableRow from 'https://esm.sh/@tiptap/extension-table-row'
+    import CodeBlockLowlight from 'https://esm.sh/@tiptap/extension-code-block-lowlight'
+
+    import css from 'https://esm.sh/highlight.js/lib/languages/css'
+    import js from 'https://esm.sh/highlight.js/lib/languages/javascript'
+    import ts from 'https://esm.sh/highlight.js/lib/languages/typescript'
+    import sql from 'https://esm.sh/highlight.js/lib/languages/sql'
+    import html from 'https://esm.sh/highlight.js/lib/languages/xml'
+    import { all, common, createLowlight } from 'https://esm.sh/lowlight@3?bundle'
+
+    const lowlight = createLowlight(common)
+    lowlight.register({ html })
+    lowlight.register({ css })
+    lowlight.register({ js })
+    lowlight.register({ ts })
+    lowlight.register({ sql })
+
+
+
+    function createTipTapEditor(elementId, content) {
+      const editor = new Editor({
+        element: document.getElementById(elementId),
+        editorProps: {
+          attributes: {
+            class: 'prose prose-truegray prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
+          },
+        },
+        extensions: [
+          StarterKit,
+          Markdown.configure({
+            html: true,                  // Allow HTML input/output
+            tightLists: false,            // No <p> inside <li> in markdown output
+            tightListClass: 'tight',     // Add class to <ul> allowing you to remove <p> margins when tight
+            bulletListMarker: '-',       // <li> prefix in markdown output
+            linkify: false,              // Create links from "https://..." text
+            breaks: false,               // New lines (\n) in markdown input are converted to <br>
+            transformPastedText: false,  // Allow to paste markdown text in the editor
+            transformCopiedText: false,  // Copied text is transformed to markdown
+          }),
+          FloatingMenu.configure({
+            element: document.querySelector('.menu-1'),
+          }),
+          BubbleMenu.configure({
+            element: document.querySelector('.menu-1'),
+          }),
+          TaskList,
+          TaskItem,
+          Table.configure({
+            resizable: true,
+          }),
+          TableRow,
+          TableHeader,
+          TableCell,
+          CodeBlockLowlight.configure({
+            lowlight,
+          })
+
+        ],
+        content,
+      })
+      return editor
+    }
+    window.createTipTapEditor = createTipTapEditor;
+  </script>
+
+</head>
+
+
+<body>
+  <div id="loader-wrapper">
+    <div id="loader" class="i-logo">
+      <div></div>
+      <div></div>
+    </div>
+  </div>
+  <div id="app" un-cloak>
+
+  </div>
+</body>
+
+</html>
