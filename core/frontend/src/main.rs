@@ -1,3 +1,4 @@
+mod graphql;
 mod tab_view;
 
 use crate::tab_view::TabView;
@@ -105,31 +106,21 @@ extern "C" {
 #[component]
 fn MarkdownPage() -> Dom {
     let fut = async {
-        let _editor = createTipTapEditor(
-            "content",
-            "# Prototyping from A to Z \n This **word** is bold.
-
-- [x] #739
-- [ ] https://github.com/octo-org/octo-repo/issues/740
-- [ ] Add delight to the experience when all tasks are complete :tada:
-
-| Syntax      | Description |
-| ----------- | ----------- |
-| Header      | Title       |
-| Paragraph   | Text        |
-
-```sql
-SELECT * FROM tasks WHERE completed = FALSE;
-```
-            ",
-        );
+        graphql::render_file(
+            "/home/geoff/Documents/kasuku/Tasks/apalis/v0.5/2023-07-28.md".to_string(),
+            None,
+        )
+        .await
+        .map(|page| {
+            let _editor = createTipTapEditor("content", &page.render_file);
+        })
+        .unwrap();
     };
     html! {
         <>
             <TabView/>
             <div class="menu-1"><button class="h-8 w-8 i-gridicons-heading-h1">"H1"</button></div>
             <article use:fut id="content" un-cloak="">
-                // <h1>"Prototyping from A to Z"</h1>
                 // <h2>"When does design come in handy?"</h2>
                 // <p>
                 //     "While it might seem like extra work at a first glance, here are some key moments in which prototyping will come in handy:"
@@ -283,11 +274,11 @@ fn home(_: &App<()>) -> Dom {
 fn main() {
     let mut app = App::new(());
     app.route("/", home);
-    app.route("/vault/:vault/:file", home); // View a specific file
-    app.route("/quick/:plugin/:view", home); // Render a specific quick view
-    app.route("/plugins", home); // View plugins
-    app.route("/plugins/:plugin", home); // View specific plugin
-    app.route("/plugins/:plugin/config", home); // Config specific plugin
+    // app.route("/vault/:vault/:file", home); // View a specific file
+    // app.route("/quick/:plugin/:view", home); // Render a specific quick view
+    // app.route("/plugins", home); // View plugins
+    // app.route("/plugins/:plugin", home); // View specific plugin
+    // app.route("/plugins/:plugin/config", home); // Config specific plugin
 
     let parent_node = web_sys::window()
         .unwrap()

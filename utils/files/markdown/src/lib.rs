@@ -112,6 +112,77 @@ pub enum Tag {
     Image(Option<LinkType>, Option<Regex>, Option<Regex>),
 }
 
+#[cfg(feature = "backend")]
+pub trait IsMatched {
+    fn is_matched(&self, tag: &pulldown_cmark::Event<'_>) -> Result<bool, regex::Error>;
+}
+
+#[cfg(feature = "backend")]
+impl IsMatched for MarkdownEvent {
+    fn is_matched(&self, event: &pulldown_cmark::Event<'_>) -> Result<bool, regex::Error> {
+        let res = match &self {
+            MarkdownEvent::Tag(tag) => {
+                if let pulldown_cmark::Event::Start(inner) = event {
+                    tag.is_matched(inner)
+                } else {
+                    false
+                }
+            }
+            MarkdownEvent::Text(text) => {
+                if let pulldown_cmark::Event::Text(inner) = event {
+                    regex::Regex::new(text)?.is_match(inner)
+                } else {
+                    false
+                }
+            }
+            MarkdownEvent::InlineCode(text) => {
+                if let pulldown_cmark::Event::Code(inner) = event {
+                    regex::Regex::new(text)?.is_match(inner)
+                } else {
+                    false
+                }
+            }
+            MarkdownEvent::FootNote(text) => {
+                if let pulldown_cmark::Event::FootnoteReference(inner) = event {
+                    regex::Regex::new(text)?.is_match(inner)
+                } else {
+                    false
+                }
+            }
+            MarkdownEvent::TaskList => {
+                matches!(event, pulldown_cmark::Event::TaskListMarker(_))
+            }
+        };
+        Ok(res)
+    }
+}
+
+#[cfg(feature = "backend")]
+impl Tag {
+    pub fn is_matched(&self, tag: &pulldown_cmark::Tag<'_>) -> bool {
+        match self {
+            Tag::Paragraph => matches!(tag, pulldown_cmark::Tag::Paragraph),
+            Tag::Heading(..) => {
+                matches!(tag, pulldown_cmark::Tag::Heading(_, _, _))
+            }
+            Tag::BlockQuote => matches!(tag, pulldown_cmark::Tag::BlockQuote),
+            Tag::CodeBlock(_) => matches!(tag, pulldown_cmark::Tag::CodeBlock(_)),
+            Tag::List => matches!(tag, pulldown_cmark::Tag::List(_)),
+            Tag::Item => matches!(tag, pulldown_cmark::Tag::Item),
+            Tag::FootnoteDefinition(_) => todo!(),
+            Tag::Table(_) => todo!(),
+            Tag::TableHead => matches!(tag, pulldown_cmark::Tag::TableHead),
+            Tag::TableRow => matches!(tag, pulldown_cmark::Tag::TableRow),
+            Tag::TableCell => matches!(tag, pulldown_cmark::Tag::TableCell),
+            Tag::Emphasis => matches!(tag, pulldown_cmark::Tag::Emphasis),
+            Tag::Strong => matches!(tag, pulldown_cmark::Tag::Strong),
+            Tag::Strikethrough => matches!(tag, pulldown_cmark::Tag::Strikethrough),
+            Tag::Link(_, _, _) => todo!(),
+            Tag::Image(_, _, _) => todo!(),
+        }
+    }
+}
+
 pub trait AsMarkdown {
     fn to_markdown<'a: 'de, 'de>(&'a self) -> Result<MarkdownFile<'de>, Error>;
     fn to_file(file: MarkdownFile<'_>, path: String) -> Result<File, Error>;
