@@ -1,5 +1,5 @@
 [internals]
-cache-path = "/tmp/kasuku-cache-3"
+cache-path = "/tmp/kasuku-cache-99"
 
 [vaults]
 planning = { plugins = ["tasks", "dataview"], mount = "/home/geoff/Documents/kasuku" }
