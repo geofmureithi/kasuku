@@ -53,7 +53,7 @@ impl Plugin for Tasks {
             "CREATE TABLE IF NOT EXISTS tasks (
                 title TEXT NOT NULL,
                 completed BOOLEAN NOT NULL,
-                source TEXT UNIQUE,
+                source TEXT,
                 due DATE,
             );",
         )?;
@@ -62,6 +62,7 @@ impl Plugin for Tasks {
 
     fn process_file(&self, ctx: &mut Context, file: File) -> Result<File, Error> {
         let path = &file.path;
+        ctx.execute(&format!("DELETE FROM tasks WHERE source = '{path}';"))?;
         let md = file.data.to_markdown()?;
 
         let events = md.get_contents();
@@ -70,7 +71,7 @@ impl Plugin for Tasks {
             if let markdown::Event::TaskListMarker(state) = event {
                 let next = events.get(index + 1);
                 if let Some(markdown::Event::Text(text)) = next {
-                    ctx.execute(&format!("INSERT INTO tasks(title, completed, source) VALUES('{text}', {state}, '{path}:{index}')"))?;
+                    ctx.execute(&format!("INSERT INTO tasks(title, completed, source) VALUES('{text}', {state}, '{path}');"))?;
                 }
             }
         }

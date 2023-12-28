@@ -40,6 +40,8 @@ impl Plugin for DataView {
                         let txt = format!("{res:?}");
                         *text = CowStr::Borrowed(txt.leak());
                     }
+                    let next_1 = events.get_mut(index + 2);
+                    ctx.debug(&format!("{next_1:?}"));
                 }
             }
         }

@@ -20,6 +20,7 @@ pub struct BackendPlugin {
     #[cfg(feature = "backend")]
     pub meta: PluginAnnotation,
 }
+#[derive(Debug)]
 pub struct Query(pub String);
 
 #[cfg(feature = "backend")]
@@ -169,6 +170,7 @@ impl Database {
         ctx_state: crate::ContextState,
     ) -> Result<Vec<crate::payload::Payload>, types::Error> {
         use kasuku_database::prelude::parse;
+        println!("{sql}");
         if let ContextState::Ref = ctx_state {
             let req = parse(&sql).map_err(|e| Error::DatabaseError(e.to_string()))?;
             if req

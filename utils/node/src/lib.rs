@@ -370,9 +370,8 @@ mod node_type_serde {
     }
 }
 
-impl EventListener for Node {
-    type Handler = types::Event;
-    fn event(&self, _name: &str, _handler: Self::Handler) {
+impl EventListener<types::Event> for Node {
+    fn event(&self, _name: &str, _handler: types::Event) {
         // self.event_handlers.borrow_mut().push(closure);
     }
 }

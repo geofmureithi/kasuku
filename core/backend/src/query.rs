@@ -3,8 +3,8 @@ use async_graphql::*;
 use interface::PluginWrapper;
 use kasuku_database::prelude::Payload;
 use markdown::AsMarkdown;
+use markdown::IsMatched;
 use markdown::MarkdownEvent;
-use node::Node;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -54,63 +54,72 @@ impl QueryRoot {
             .database
             .lock()
             .unwrap()
-            .execute("SELECT * FROM subscriptions WHERE event = 'MarkdownEvent';")
+            .execute("SELECT * FROM subscriptions WHERE event = 'markdown::MarkdownEvent';")
             .unwrap();
         let subscriptions = res.get(0).unwrap();
-        match subscriptions {
+
+        let render = match subscriptions {
             Payload::Select { rows, .. } => {
-                let _filters: Vec<MarkdownEvent> = rows
+                let filters: Vec<(MarkdownEvent, String)> = rows
                     .iter()
-                    .map(|row| match row.get(3).unwrap() {
-                        kasuku_database::prelude::Value::Str(val) => {
-                            serde_json::from_str(val).unwrap()
-                        }
-                        _ => unreachable!(),
+                    .map(|row| {
+                        (
+                            match row.get(3).unwrap() {
+                                kasuku_database::prelude::Value::Str(val) => {
+                                    serde_json::from_str(val).unwrap()
+                                }
+                                _ => unreachable!(),
+                            },
+                            row.get(0)
+                                .map(|s| match s {
+                                    kasuku_database::prelude::Value::Str(txt) => txt.clone(),
+                                    _ => unreachable!(),
+                                })
+                                .unwrap(),
+                        )
                     })
                     .collect();
-                let tasks: PluginWrapper<BackendPlugin, _> =
-                    runtime.get_plugin_by_name("tasks").unwrap();
-                let dataview: PluginWrapper<BackendPlugin, _> =
-                    runtime.get_plugin_by_name("dataview").unwrap();
-                let mut md = {
-                    let md = tokio::fs::read_to_string(&path).await.unwrap();
+                let md = tokio::fs::read_to_string(&path).await.unwrap();
 
-                    let events = markdown::parse(&md).unwrap();
+                let events = markdown::parse(&md).unwrap();
+                let plugins: Vec<String> = events
+                    .events
+                    .iter()
+                    .flat_map(move |event| {
+                        filters
+                            .clone()
+                            .iter()
+                            .filter(move |filter| filter.0.is_matched(event).unwrap())
+                            .map(|c| c.1.clone())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<std::collections::HashSet<String>>()
+                    .into_iter()
+                    .collect::<Vec<String>>();
+                let mut md = {
                     ::types::File {
                         data: ::types::FileType::Markdown(bincode::serialize(&events).unwrap()),
                         path,
                     }
                 };
-                md = tasks
-                    .process_file(::context::Context::acquire(), md)
-                    .await
-                    .unwrap();
-                md = dataview
-                    .process_file(::context::Context::acquire(), md)
-                    .await
-                    .unwrap();
+                for plugin in plugins {
+                    println!("{plugin:?}");
+                    let plugin: PluginWrapper<BackendPlugin, _> =
+                        runtime.get_plugin_by_name(&plugin).unwrap();
+                    md = plugin
+                        .process_file(::context::Context::acquire(), md)
+                        .await
+                        .unwrap();
+                }
                 let mut buf = String::new();
                 let md_events = &md.data.to_markdown().unwrap().events;
                 pulldown_cmark_to_cmark::cmark(md_events.iter(), &mut buf).unwrap();
-                println!("{buf}");
+                buf
             }
             _ => unreachable!(),
         };
 
-        let plugin: PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name("tasks").unwrap();
-        let res = plugin
-            .render(
-                ::context::Context::acquire(),
-                Event {
-                    namespace: "".to_string(),
-                    data: vec![],
-                },
-            )
-            .await
-            .unwrap();
-        let nodes: Node = res.try_into().unwrap();
-
-        serde_json::to_value(&nodes).unwrap()
+        serde_json::to_value(render).unwrap()
     }
     async fn vaults(&self, ctx: &Context<'_>) -> Vec<Vault> {
         let runtime: &KasukuRuntime = ctx.data().unwrap();

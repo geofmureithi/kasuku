@@ -1,3 +1,7 @@
 [build]
 target = "index.html"
 dist = "dist"
+
+[[proxy]]
+rewrite = "/api/v1/graphql"
+backend = "http://localhost:3001/"
