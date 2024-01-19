@@ -67,7 +67,7 @@ impl KasukuRuntime {
         let mut glue_db = Glue::new(kasuku_database);
         glue_db
             .execute(
-                "   DROP TABLE IF EXISTS subscriptions;
+                "DROP TABLE IF EXISTS subscriptions;
                 DROP TABLE IF EXISTS vaults;
                 DROP TABLE IF EXISTS entries;
                 DROP TABLE IF EXISTS tasks;
@@ -125,7 +125,7 @@ impl KasukuRuntime {
                     ))?
                 )))
                 .await
-                .map_err(|err| types::Error::DatabaseError(err.to_string()))?
+                // .map_err(|err| types::Error::DatabaseError(err.to_string()))?
                 .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
             let mv_act = mv_act.clone();
             tokio::spawn(async move {

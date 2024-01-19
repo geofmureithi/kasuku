@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 types = { path = "../../core/types" }
-hirola = { version = "0.4.0-beta.0", default-features = false }
+hirola = { version = "0.4.0", default-features = false }
 plugy = { version = "0.3.1" }
 bincode = "1"
 serde = "1"

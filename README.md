@@ -1,24 +1,51 @@
 # Kasuku
 
-Kasuku is a all-in-one personal management system using wasm
+Kasuku is lightweight, extensible all-in-one planning tool that makes every day more efficient.
 
-<!-- ![Kasuku Screenshot](screenshot.png) -->
+## Features 🌟
 
-## Todo Features
+- **Efficient & Lightweight**: Built in Rust with a low memory footprint and light plugins.
+- **Cross-Platform**: Runs smoothly on Web, Mobile, and Desktop.
+- **Customizable**: Extend functionality with Rust-based plugins compiled into WASM.
+- **Dynamic SQL Engine**: Powerful data management with an inbuilt SQL engine.
 
-- [**📝Tasks:**](/plugins/tasks/) Stay on top of your to-do list and tasks. Mark tasks as complete, set priorities, and organize your day.
+## Ready plugins 🎉
 
-- **Notes:** Capture your thoughts, ideas, and inspirations. Organize notes into categories and easily search for them.
+### 📝 Tasks
 
-- **Fitness:** Track your workouts, diet plans, and health metrics. Set fitness goals and monitor your progress.
+Prioritize, organize, and tackle your goals. [🔗](/plugins/tasks/)
 
-- **Finance:** Manage your budgets, expenses, and income. Gain insights into your financial health and savings.
+### 🤓 DataView
 
-- **Files:** Organize important files and documents of various formats. Easily access and store your files securely.
+SQL + Markdown = Magic! Query your heart out and manipulate data like a wizard. [🔗](/plugins/dataview/)
 
-- **Schedule:** Keep your schedule organized. Schedule events, meetings, and appointments with ease.
+### 🎨 Templates
 
-- **Growth:** Cultivate personal growth by tracking skills learned and knowledge gained. Set goals and measure progress.
+Say goodbye to monotony. Automate with templates and free up time for the fun stuff. [🔗](/plugins/template/)
+
+## But Wait, There's More! 🚀 Upcoming Plugins:
+
+### 🌐 Web Clipper
+
+Soon, you'll be able to snag bits of the web directly into Kasuku. Research, resources, inspirations—clip it all!
+
+### 📊 Dashboard
+
+Visualize your progress with customizable dashboards. See your productivity soar in vibrant charts and graphs.
+
+### 🕹️ Gamify
+
+Turn tasks into a game. Earn points, level up, and make productivity an adventure.
+
+### 📅 Calendar Sync
+
+Seamlessly integrate with your favorite calendars. Never miss a beat, meeting, or milestone.
+
+### 🧠 Mind Mapper
+
+Brainstorming made beautiful. Organize thoughts, ideas, and plans in visually stunning mind maps.
+
+Stay tuned for these exciting additions! With Kasuku, your productivity journey just keeps getting better. ✨
 
 ## Installation
 
