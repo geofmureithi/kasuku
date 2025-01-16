@@ -1,20 +1,21 @@
-use backend::KasukuRuntime;
-use figment::{
-    providers::{Env, Format, Toml},
-    Figment,
-};
-use types::config::Config;
+use backend::{read_config, KasukuRuntime};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() {
-    let config: Config = Figment::new()
-        .merge(Toml::file("Kasuku.toml"))
-        .merge(Env::prefixed("KASUKU_"))
-        .extract()
-        .unwrap();
+    use tracing_subscriber::EnvFilter;
+
+    let fmt_layer = tracing_subscriber::fmt::layer().with_target(false);
+    let filter_layer = EnvFilter::try_new("info").unwrap();
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .init();
+
+    let config = read_config();
     // config.validate().expect("Invalid config");
-    let runtime = KasukuRuntime::new(config)
+    let runtime = KasukuRuntime::new(&config)
         .await
         .expect("Could not start the runtime");
-    let _app = backend::app(3001, runtime).await;
+    let _app = backend::app(config.server.port, runtime).await;
 }

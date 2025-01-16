@@ -6,12 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 default = ["backend"]
-backend = ["tokio", "regex"]
+backend = ["tokio", "regex", "pulldown-cmark/html"]
 
 [dependencies]
-pulldown-cmark = { version = "0.9.3", features = ["serde"] }
+pulldown-cmark = { version = "0.12.2", features = ["serde"] }
 types = { path = "../../../core/types" }
-serde = "1"
+serde = { version = "1", features = ["rc"] }
+plugy = { git = "https://github.com/geofmureithi/plugy.git", branch = "chore/msgpack-codec", default-features = false, features = [
+    "core",
+] }
 tokio = { version = "1", optional = true }
-bincode = "1"
 regex = { version = "1.10.2", optional = true }
+macros = { path = "../../../core/macros" }

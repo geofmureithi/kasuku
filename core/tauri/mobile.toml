@@ -1,0 +1,8 @@
+[app]
+name = "kasuku"
+stylized-name = "Kasuku"
+identifier = "io.kasuku.app"
+template-pack = "winit"
+
+[apple]
+development-team = "0"

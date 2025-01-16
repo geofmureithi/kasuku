@@ -1,3 +1,6 @@
+use std::ops::Deref;
+use std::ops::DerefMut;
+
 pub use pulldown_cmark::Alignment;
 pub use pulldown_cmark::Event;
 pub use pulldown_cmark::HeadingLevel;
@@ -6,7 +9,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use types::Error;
 use types::File;
-use types::FileType;
 use types::IdentityPlugin;
 use types::PluginEvent;
 
@@ -28,15 +30,20 @@ pub fn parse(content: &str) -> Result<MarkdownFile<'_>, types::Error> {
     Ok(MarkdownFile { events })
 }
 
-impl<'a> MarkdownFile<'a> {
-    pub fn get_contents(&'a self) -> &Vec<Event<'a>> {
+impl<'a> Deref for MarkdownFile<'a> {
+    type Target = Vec<Event<'a>>;
+
+    fn deref(&self) -> &Self::Target {
         &self.events
     }
+}
 
-    pub fn get_contents_mut(&'a mut self) -> &mut Vec<Event<'a>> {
+impl<'a> DerefMut for MarkdownFile<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.events
     }
 }
+
 pub type Regex = String;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -163,9 +170,9 @@ impl Tag {
         match self {
             Tag::Paragraph => matches!(tag, pulldown_cmark::Tag::Paragraph),
             Tag::Heading(..) => {
-                matches!(tag, pulldown_cmark::Tag::Heading(_, _, _))
+                matches!(tag, pulldown_cmark::Tag::Heading { .. })
             }
-            Tag::BlockQuote => matches!(tag, pulldown_cmark::Tag::BlockQuote),
+            Tag::BlockQuote => matches!(tag, pulldown_cmark::Tag::BlockQuote(_)),
             Tag::CodeBlock(_) => matches!(tag, pulldown_cmark::Tag::CodeBlock(_)),
             Tag::List => matches!(tag, pulldown_cmark::Tag::List(_)),
             Tag::Item => matches!(tag, pulldown_cmark::Tag::Item),
@@ -183,27 +190,20 @@ impl Tag {
     }
 }
 
-pub trait AsMarkdown {
-    fn to_markdown<'a: 'de, 'de>(&'a self) -> Result<MarkdownFile<'de>, Error>;
-    fn to_file(file: MarkdownFile<'_>, path: String) -> Result<File, Error>;
+impl<'a> TryFrom<&'a File> for MarkdownFile<'a> {
+    type Error = Error;
+
+    fn try_from(value: &'a File) -> Result<Self, Self::Error> {
+        plugy::core::codec::deserialize(&value.data).map_err(|e| Error::FileCodec(e.to_string()))
+    }
 }
 
-impl AsMarkdown for FileType {
-    fn to_file(file: MarkdownFile<'_>, path: String) -> Result<File, Error> {
+impl<'a> TryInto<File> for MarkdownFile<'a> {
+    type Error = Error;
+    fn try_into(self) -> Result<File, Self::Error> {
         Ok(File {
-            path,
-            data: FileType::Markdown(
-                bincode::serialize(&file).map_err(|e| Error::FileCodec(e.to_string()))?,
-            ),
+            data: plugy::core::codec::serialize(&self)
+                .map_err(|e| Error::FileCodec(e.to_string()))?,
         })
-    }
-    fn to_markdown<'a: 'de, 'de>(&'a self) -> Result<MarkdownFile<'de>, Error> {
-        let res = match self {
-            FileType::Markdown(bytes) => {
-                bincode::deserialize(bytes).map_err(|e| Error::FileCodec(e.to_string()))?
-            }
-            _ => unreachable!(),
-        };
-        Ok(res)
     }
 }

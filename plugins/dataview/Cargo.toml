@@ -9,7 +9,7 @@ license = "MIT"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-plugy = { version = "0.3.1" }
+plugy = { git = "https://github.com/geofmureithi/plugy.git", branch = "chore/msgpack-codec" }
 types = { path = "../../core/types" }
 interface = { path = "../../core/interface" }
 markdown = { path = "../../utils/files/markdown", default-features = false }

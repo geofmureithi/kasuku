@@ -23,12 +23,12 @@ fn TabHeader<'a>(title: &'a str, icon: &'a str) -> Dom {
 pub fn TabView() -> Dom {
     let items = vec![
         ("Dashboard", "ic-sharp-dashboard"),
-        ("today.md", "ri-markdown-fill"),
+        ("test.md", "ri-markdown-fill"),
         ("test.pdf", "bi-file-earmark-pdf-fill"),
     ];
     html! {
-        <div class="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700 mt-14 ml-64">
-            <ul class="flex flex-wrap -mb-px inline-block">
+        <div class="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700 bg-white fixed w-full">
+            <ul class="flex flex-wrap -mb-px">
                 {for (title, icon) in items {
                     html! {
                         <>
@@ -41,3 +41,4 @@ pub fn TabView() -> Dom {
         </div>
     }
 }
+ 

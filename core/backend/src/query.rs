@@ -1,10 +1,9 @@
 use ::types::Event;
 use async_graphql::*;
 use interface::PluginWrapper;
-use kasuku_database::prelude::Payload;
-use markdown::AsMarkdown;
 use markdown::IsMatched;
 use markdown::MarkdownEvent;
+use markdown::MarkdownFile;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -29,7 +28,7 @@ impl File {
         let plugin: PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name("tasks").unwrap();
         let res = plugin
             .render(
-                ::context::Context::acquire(),
+                &::context::Context::default(),
                 Event {
                     namespace: "text".to_string(),
                     data: vec![],
@@ -50,94 +49,65 @@ impl QueryRoot {
         _renderer: Option<String>,
     ) -> serde_json::Value {
         let runtime: &KasukuRuntime = ctx.data().unwrap();
-        let res = runtime
+
+        #[derive(Debug, Deserialize, Clone)]
+        struct Subscription {
+            data: String,
+            plugin: String,
+        }
+        let subscriptions: Vec<Subscription> = runtime
             .database
-            .lock()
-            .unwrap()
-            .execute("SELECT * FROM subscriptions WHERE event = 'markdown::MarkdownEvent';")
+            .query(
+                "SELECT data, plugin FROM subscriptions WHERE event = 'markdown::MarkdownEvent';",
+            )
+            .await
             .unwrap();
-        let subscriptions = res.get(0).unwrap();
 
-        let render = match subscriptions {
-            Payload::Select { rows, .. } => {
-                let filters: Vec<(MarkdownEvent, String)> = rows
+        let md = tokio::fs::read_to_string(&path).await.unwrap();
+
+        let file = markdown::parse(&md).unwrap();
+        let plugins: Vec<String> = file
+            .iter()
+            .flat_map(move |event| {
+                subscriptions
+                    .clone()
                     .iter()
-                    .map(|row| {
-                        (
-                            match row.get(3).unwrap() {
-                                kasuku_database::prelude::Value::Str(val) => {
-                                    serde_json::from_str(val).unwrap()
-                                }
-                                _ => unreachable!(),
-                            },
-                            row.get(0)
-                                .map(|s| match s {
-                                    kasuku_database::prelude::Value::Str(txt) => txt.clone(),
-                                    _ => unreachable!(),
-                                })
-                                .unwrap(),
-                        )
+                    .filter(move |filter| {
+                        serde_json::from_str::<MarkdownEvent>(&filter.data)
+                            .unwrap()
+                            .is_matched(event)
+                            .unwrap()
                     })
-                    .collect();
-                let md = tokio::fs::read_to_string(&path).await.unwrap();
+                    .map(|c| c.plugin.clone())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<std::collections::HashSet<String>>()
+            .into_iter()
+            .collect::<Vec<String>>();
+        let mut md: ::types::File = file.try_into().unwrap();
+        for plugin in plugins {
+            println!("{plugin:?}");
+            let plugin: PluginWrapper<BackendPlugin, _> =
+                runtime.get_plugin_by_name(&plugin).unwrap();
+            md = plugin
+                .process_file(&mut ::context::Context::default(), md)
+                .await
+                .unwrap();
+        }
+        let mut buf = String::new();
+        let md: MarkdownFile = (&md).try_into().unwrap();
+        pulldown_cmark_to_cmark::cmark(md.iter(), &mut buf).unwrap();
 
-                let events = markdown::parse(&md).unwrap();
-                let plugins: Vec<String> = events
-                    .events
-                    .iter()
-                    .flat_map(move |event| {
-                        filters
-                            .clone()
-                            .iter()
-                            .filter(move |filter| filter.0.is_matched(event).unwrap())
-                            .map(|c| c.1.clone())
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<std::collections::HashSet<String>>()
-                    .into_iter()
-                    .collect::<Vec<String>>();
-                let mut md = {
-                    ::types::File {
-                        data: ::types::FileType::Markdown(bincode::serialize(&events).unwrap()),
-                        path,
-                    }
-                };
-                for plugin in plugins {
-                    println!("{plugin:?}");
-                    let plugin: PluginWrapper<BackendPlugin, _> =
-                        runtime.get_plugin_by_name(&plugin).unwrap();
-                    md = plugin
-                        .process_file(::context::Context::acquire(), md)
-                        .await
-                        .unwrap();
-                }
-                let mut buf = String::new();
-                let md_events = &md.data.to_markdown().unwrap().events;
-                pulldown_cmark_to_cmark::cmark(md_events.iter(), &mut buf).unwrap();
-                buf
-            }
-            _ => unreachable!(),
-        };
-
-        serde_json::to_value(render).unwrap()
+        serde_json::to_value(buf).unwrap()
     }
     async fn vaults(&self, ctx: &Context<'_>) -> Vec<Vault> {
         let runtime: &KasukuRuntime = ctx.data().unwrap();
-        let mut lock = runtime.database.lock();
-        let db = lock.as_mut();
-        let database = db.unwrap();
-        let res = database.execute("Select name, mount from vaults").unwrap();
-        let payload = res.get(0).unwrap();
-        match payload {
-            Payload::Select { rows, .. } => rows
-                .iter()
-                .map(|row| Vault {
-                    name: row.get(0).unwrap().into(),
-                    mount: row.get(1).unwrap().into(),
-                })
-                .collect(),
-            _ => unreachable!(),
-        }
+        let vaults: Vec<Vault> = runtime
+            .database
+            .query("Select name, mount from vaults")
+            .await
+            .unwrap();
+        vaults
     }
 
     async fn config(&self) -> u8 {
@@ -162,26 +132,16 @@ impl Vault {
         limit: Option<u32>,
     ) -> Vec<File> {
         let runtime: &KasukuRuntime = ctx.data().unwrap();
-        let mut lock = runtime.database.lock();
-        let db = lock.as_mut();
-        let database = db.unwrap();
-        let res = database
-            .execute(format!(
+        let res: Vec<File> = runtime
+            .database
+            .query(&format!(
                 "Select path from entries WHERE vault = '{}' OFFSET {} LIMIT {};",
                 self.name,
                 offset.unwrap_or(0),
                 limit.unwrap_or(0)
             ))
+            .await
             .unwrap();
-        let payload = res.get(0).unwrap();
-        match payload {
-            Payload::Select { rows, .. } => rows
-                .iter()
-                .map(|row| File {
-                    path: row.get(0).unwrap().into(),
-                })
-                .collect(),
-            _ => unreachable!(),
-        }
+        res
     }
 }

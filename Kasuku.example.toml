@@ -1,0 +1,23 @@
+# An example config for running
+[server]
+ip = "0.0.0.0"
+port = 3000
+
+[internals]
+cache-path = "/tmp/kasuku-cache-99"
+
+[vaults]
+planning = { plugins = ["tasks", "dataview"], mount = "~/Documents/Kasuku" }
+
+[plugins]
+tasks = { uri = "./target/wasm32-unknown-unknown/release/tasks.wasm" }
+dataview = { uri = "./target/wasm32-unknown-unknown/release/dataview.wasm", config = { tag = "dataview" } }
+
+
+[events]
+'cron::Daily' = [
+    "tasks::CleanUp",
+    "template::GenerateDaily",
+    "fitness::TrackDaily",
+]
+"tasks::TaskEvent::Delete" = ["growth::Cleanup"]

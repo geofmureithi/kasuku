@@ -3,7 +3,9 @@ use types::{Error, Event, File, IdentityPlugin, Rsx};
 
 #[allow(unused_variables)]
 #[plugy::macros::plugin]
-pub trait Plugin: Send + Sync {
+// TODO: Make the plugin api more composable
+// TODO: Handle types like File and Event better
+pub trait Plugin: Send + Sync + 'static {
     fn on_load(&self, ctx: &mut Context) -> Result<(), Error>;
 
     fn process_file(&self, ctx: &mut Context, file: File) -> Result<File, Error> {

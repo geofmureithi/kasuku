@@ -1,10 +1,15 @@
-mod graphql;
 mod tab_view;
 
 use crate::tab_view::TabView;
+use gloo_net::http::Request;
 use hirola::dom::app::App;
 use hirola::dom::*;
 use hirola::prelude::*;
+use web_sys::window;
+
+pub struct State {
+    // config: Config,
+}
 
 #[component]
 fn Logo() -> Dom {
@@ -14,8 +19,8 @@ fn Logo() -> Dom {
 #[component]
 fn SideBar() -> Dom {
     html! {
-        <aside class="fixed top-0 left-0 z-40 w-64 h-screen pt-14" aria-label="Sidebar" un-cloak="">
-            <div class="h-full px-3 py-4 overflow-y-auto bg-gray-50 dark:bg-gray-800">
+        <aside class="w-full" aria-label="Sidebar" un-cloak="">
+            <div class="h-full px-3 py-4">
                 <ul class="space-2 font-medium">
                     <li>
                         <a
@@ -98,29 +103,31 @@ fn SideBar() -> Dom {
     }
 }
 
-#[wasm_bindgen::prelude::wasm_bindgen]
-extern "C" {
-    fn createTipTapEditor(element: &str, content: &str) -> u32;
-}
-
 #[component]
 fn MarkdownPage() -> Dom {
     let fut = async {
-        graphql::render_file(
-            "/home/geoff/Documents/kasuku/Tasks/apalis/v0.5/2023-07-28.md".to_string(),
-            None,
-        )
-        .await
-        .map(|page| {
-            let _editor = createTipTapEditor("content", &page.render_file);
-        })
-        .unwrap();
+        let response = Request::get("/api/v1/vaults/Default/file/vault/test.md")
+            .build()
+            .expect("Failed to build request")
+            .send()
+            .await
+            .map_err(|err| err.to_string())
+            .unwrap()
+            .text()
+            .await;
+
+        let element = window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .get_element_by_id("content")
+            .unwrap();
+        element.set_inner_html(&response.unwrap());
     };
     html! {
         <>
             <TabView/>
-            <div class="menu-1"><button class="h-8 w-8 i-gridicons-heading-h1">"H1"</button></div>
-            <article use:future={fut} id="content" un-cloak="">
+            <article class="text-base prose prose-truegray container mx-auto p-4 pt-8" use:future={fut} id="content" un-cloak="">
             </article>
 
         </>
@@ -130,7 +137,7 @@ fn MarkdownPage() -> Dom {
 fn Nav() -> Dom {
     html! {
         <nav
-            class="fixed top-0 z-50 w-full bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+            class="z-50 top-0 fixed w-full bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700"
             un-cloak=""
         >
             <div class="px-3 py-3 lg:px-5 lg:pl-3">
@@ -244,8 +251,16 @@ fn home(_: &App<()>) -> Dom {
     html! {
         <>
             <Nav/>
-            <SideBar/>
-            <MarkdownPage/>
+            <div class="grid grid-cols-6">
+            <div class="col-span-1 min-width-48 bg-gray-50 dark:bg-gray-800 h-screen overflow-scroll pt-10">
+                <SideBar/>
+            </div>
+            <div class="col-span-5 flex h-screen">
+                <div class="flex-1 overflow-scroll pt-14">
+                    <MarkdownPage/>
+                </div>
+            </div>
+            </div>
         </>
     }
 }

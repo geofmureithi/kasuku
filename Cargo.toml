@@ -3,7 +3,7 @@ members = [
     "core/backend",
     "core/frontend",
     "core/macros",
-    # "crates/tauri",
+    "core/tauri",
     "core/types",
     "core/interface",
     "utils/database",
@@ -13,8 +13,9 @@ members = [
     "utils/node",
     "plugins/tasks",
     "plugins/dataview",
-    "plugins/template"
-
+    "plugins/template",
+    "utils/xtask",
+    "utils/llm",
 ]
 resolver = "2"
 

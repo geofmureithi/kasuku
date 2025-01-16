@@ -1,14 +1,22 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use context::Context;
+use interface::Plugin;
+use plugy::macros::plugin_impl;
+use types::Error;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct TemplatePlugin;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+#[plugin_impl]
+impl Plugin for TemplatePlugin {
+    fn on_load(&self, _ctx: &mut Context) -> Result<(), Error> {
+        // Create table templates
+        // Register setting menu item "Templates"
+        // Subscribe to plugin events
+        // CreateTemplate -> creates a template given the path and context
+
+        // registerAction/Command
+
+        // Automator: Every Morning -> InvokeCommand: Generate Daily Note
+
+        Ok(())
     }
 }

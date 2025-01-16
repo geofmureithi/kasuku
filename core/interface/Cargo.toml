@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 context = { path = "../../utils/context", default-features = false}
 node = { path = "../../utils/node" }       #features = sync
-plugy = { version = "0.3" }
+plugy = { git = "https://github.com/geofmureithi/plugy.git", branch = "chore/msgpack-codec" }
 types = { path = "../types" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
