@@ -9,27 +9,30 @@ use std::ops::{Deref, DerefMut};
 pub struct NamedParamSlice(Vec<(String, Box<dyn tokio_rusqlite::types::ToSql>)>);
 
 impl NamedParamSlice {
-	pub fn to_slice(&self) -> Vec<(&str, &dyn tokio_rusqlite::types::ToSql)> {
-		self.0.iter().map(|x| (x.0.as_str(), x.1.borrow())).collect()
-	}
+    pub fn to_slice(&self) -> Vec<(&str, &dyn tokio_rusqlite::types::ToSql)> {
+        self.0
+            .iter()
+            .map(|x| (x.0.as_str(), x.1.borrow()))
+            .collect()
+    }
 }
 
 impl From<Vec<(String, Box<dyn tokio_rusqlite::types::ToSql>)>> for NamedParamSlice {
-	fn from(src: Vec<(String, Box<dyn tokio_rusqlite::types::ToSql>)>) -> Self {
-		Self(src)
-	}
+    fn from(src: Vec<(String, Box<dyn tokio_rusqlite::types::ToSql>)>) -> Self {
+        Self(src)
+    }
 }
 
 impl Deref for NamedParamSlice {
-	type Target = Vec<(String, Box<dyn tokio_rusqlite::types::ToSql>)>;
+    type Target = Vec<(String, Box<dyn tokio_rusqlite::types::ToSql>)>;
 
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl DerefMut for NamedParamSlice {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
-	}
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
