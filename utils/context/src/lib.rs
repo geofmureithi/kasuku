@@ -288,7 +288,6 @@ impl<'de> Deserialize<'de> for &Context {
 #[derive(Debug, Clone)]
 pub struct Context;
 
-
 impl Serialize for &Context {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

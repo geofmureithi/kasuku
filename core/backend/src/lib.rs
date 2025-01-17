@@ -293,7 +293,6 @@ async fn get_file(
     let md = tokio::fs::read_to_string(&filename).await.unwrap();
     let file = markdown::parse(&md).unwrap();
 
-    
     let subscriptions: Vec<Subscription> = tx
         .query(
             "SELECT s.data, s.plugin FROM subscriptions s WHERE event = 'markdown::MarkdownEvent' ORDER BY s.rowid ASC",
@@ -301,7 +300,6 @@ async fn get_file(
         .await
         .unwrap();
 
-    
     let plugins: Vec<String> = file
         .iter()
         .flat_map(move |event| {
