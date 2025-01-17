@@ -1,8 +1,11 @@
 name: Continuous integration
 on:
-  - push
-  - pull_request
-  - workflow_call
+  push:
+    # TODO: add develop
+    branches: [main]
+  pull_request:
+  workflow_call:
+
 jobs:
   check:
     name: Check
@@ -16,7 +19,7 @@ jobs:
           override: true
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libgtk2.0-dev libglib2.0-dev
+          packages: libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: actions-rs/cargo@v1
         with:
           command: check
@@ -33,7 +36,7 @@ jobs:
 
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libgtk2.0-dev libglib2.0-dev
+          packages: libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - uses: actions-rs/cargo@v1
         with:
@@ -66,7 +69,7 @@ jobs:
           override: true
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libgtk2.0-dev libglib2.0-dev
+          packages: libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - run: rustup component add clippy
       - uses: actions-rs/cargo@v1
         with:
