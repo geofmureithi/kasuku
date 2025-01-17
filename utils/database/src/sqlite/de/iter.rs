@@ -29,7 +29,7 @@ impl<D: DeserializeOwned> Iterator for DeserRows<'_, D> {
         deser_row(
             self.rows
                 .next()
-                .map_err(|e| tokio_rusqlite::Error::Rusqlite(e)),
+                .map_err(tokio_rusqlite::Error::Rusqlite),
             &self.columns,
         )
     }
@@ -59,7 +59,7 @@ impl<D: DeserializeOwned> Iterator for DeserRowsRef<'_, '_, D> {
         deser_row(
             self.rows
                 .next()
-                .map_err(|e| tokio_rusqlite::Error::Rusqlite(e)),
+                .map_err(tokio_rusqlite::Error::Rusqlite),
             &self.columns,
         )
     }

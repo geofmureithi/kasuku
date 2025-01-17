@@ -48,7 +48,7 @@ impl KasukuDatabase {
             .inner
             .call(move |conn| {
                 conn.execute(query.as_ref(), [])
-                    .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))
+                    .map_err(tokio_rusqlite::Error::Rusqlite)
             })
             .await?)
     }
@@ -68,7 +68,7 @@ impl KasukuDatabase {
                     query.as_ref(),
                     to_params(&params).map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?,
                 )
-                .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))
+                .map_err(tokio_rusqlite::Error::Rusqlite)
             })
             .await?)
     }
@@ -91,7 +91,7 @@ impl KasukuDatabase {
                         .to_slice()
                         .as_slice(),
                 )
-                .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))
+                .map_err(tokio_rusqlite::Error::Rusqlite)
             })
             .await?)
     }
@@ -111,7 +111,7 @@ impl KasukuDatabase {
                         from_row_with_columns::<Res>(row, &columns)
                             .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))
                     })
-                    .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    .map_err(tokio_rusqlite::Error::Rusqlite)?;
                 rows.collect()
             })
             .await?)
@@ -140,7 +140,7 @@ impl KasukuDatabase {
                                 .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))
                         },
                     )
-                    .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    .map_err(tokio_rusqlite::Error::Rusqlite)?;
                 rows.collect()
             })
             .await?)
@@ -171,7 +171,7 @@ impl KasukuDatabase {
                                 .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))
                         },
                     )
-                    .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    .map_err(tokio_rusqlite::Error::Rusqlite)?;
                 rows.collect()
             })
             .await?)
@@ -189,7 +189,7 @@ impl KasukuDatabase {
                         from_row_with_columns::<BTreeMap<String, RawValue>>(row, &columns)
                             .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))
                     })
-                    .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?
+                    .map_err(tokio_rusqlite::Error::Rusqlite)?
                     .map(|res| res.unwrap())
                     .collect();
                 Ok(Table { columns, rows })
@@ -198,6 +198,6 @@ impl KasukuDatabase {
     }
 
     pub async fn transaction(&self) -> Transaction<'_> {
-        Transaction::new(&self).await
+        Transaction::new(self).await
     }
 }

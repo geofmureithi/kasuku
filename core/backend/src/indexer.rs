@@ -19,7 +19,7 @@ pub async fn run_indexer(
 
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
-    watcher.watch(&cfg.mount.as_ref(), RecursiveMode::Recursive)?;
+    watcher.watch(cfg.mount.as_ref(), RecursiveMode::Recursive)?;
 
     while let Some(res) = rx.next().await {
         match res {

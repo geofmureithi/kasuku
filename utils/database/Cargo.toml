@@ -15,3 +15,7 @@ tokio = "1"
 sqlparser = "0.30"
 types = { path = "../../core/types" }
 tracing = "0.1"
+
+[dev-dependencies]
+rusqlite = "*"
+serde_bytes = "0.11"

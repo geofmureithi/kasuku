@@ -1,7 +1,7 @@
 use std::{collections, fmt::Debug};
 
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::Error;
 

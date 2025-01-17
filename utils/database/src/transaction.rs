@@ -38,7 +38,7 @@ impl<'a> Transaction<'a> {
     }
 }
 
-impl<'a> Drop for Transaction<'a> {
+impl Drop for Transaction<'_> {
     fn drop(&mut self) {
         if !self.exhausted {
             tracing::warn!("Dropping a transaction that is not committed. calling ROLLBACK;");
@@ -47,7 +47,7 @@ impl<'a> Drop for Transaction<'a> {
     }
 }
 
-impl<'a> Deref for Transaction<'a> {
+impl Deref for Transaction<'_> {
     type Target = KasukuDatabase;
 
     fn deref(&self) -> &Self::Target {

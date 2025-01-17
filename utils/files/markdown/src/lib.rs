@@ -38,7 +38,7 @@ impl<'a> Deref for MarkdownFile<'a> {
     }
 }
 
-impl<'a> DerefMut for MarkdownFile<'a> {
+impl DerefMut for MarkdownFile<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.events
     }
@@ -51,9 +51,13 @@ pub type Regex = String;
 pub enum MarkdownEvent {
     #[serde(rename = "MarkdownEvent::Tag")]
     Tag(Tag),
+    #[serde(rename = "MarkdownEvent::Text")]
     Text(Regex),
+    #[serde(rename = "MarkdownEvent::InlineCode")]
     InlineCode(Regex),
+    #[serde(rename = "MarkdownEvent::FootNote")]
     FootNote(Regex),
+    #[serde(rename = "MarkdownEvent::TaskList")]
     TaskList,
 }
 
@@ -198,7 +202,7 @@ impl<'a> TryFrom<&'a File> for MarkdownFile<'a> {
     }
 }
 
-impl<'a> TryInto<File> for MarkdownFile<'a> {
+impl TryInto<File> for MarkdownFile<'_> {
     type Error = Error;
     fn try_into(self) -> Result<File, Self::Error> {
         Ok(File {

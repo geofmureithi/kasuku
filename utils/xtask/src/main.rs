@@ -40,8 +40,8 @@ dev             runs the dev server
 }
 
 async fn dist() -> Result<(), DynError> {
-    let _ = fs::remove_dir_all(&dist_dir());
-    fs::create_dir_all(&dist_dir())?;
+    let _ = fs::remove_dir_all(dist_dir());
+    fs::create_dir_all(dist_dir())?;
 
     dist_backend_binary().await?;
 
@@ -54,7 +54,7 @@ async fn dist_backend_binary() -> Result<(), DynError> {
     backend.push("core/backend");
     let status = Command::new(cargo)
         .current_dir(backend)
-        .args(&["build", "--release"])
+        .args(["build", "--release"])
         .status()
         .await?;
 
@@ -98,8 +98,8 @@ fn dist_dir() -> PathBuf {
 }
 
 async fn dev_server() -> Result<(), DynError> {
-    let _ = fs::remove_dir_all(&dev_dir());
-    fs::create_dir_all(&dev_dir())?;
+    let _ = fs::remove_dir_all(dev_dir());
+    fs::create_dir_all(dev_dir())?;
 
     let mut config = types::config::Config::default();
 
@@ -154,7 +154,7 @@ async fn dev_server() -> Result<(), DynError> {
 
 ## Notes created today
 ```sql,dataview
-SELECT * FROM sqlite_master
+SELECT data, plugin FROM subscriptions WHERE EXISTS ( SELECT 1 FROM json_each(data) AS keys WHERE keys.key IN ('CodeBlock', 'InlineCode', 'OtherKey1', 'OtherKey2')) AND event = 'markdown::MarkdownEvent'
 ```
 
 ## Notes
@@ -198,7 +198,7 @@ async fn build_plugin<P: AsRef<str>>(plugin: P) -> Result<(), DynError> {
     let plugin_path = project_root().join(format!("plugins/{}", plugin.as_ref()));
     let status = Command::new(cargo)
         .current_dir(plugin_path)
-        .args(&["build", "--release", "--target=wasm32-unknown-unknown"])
+        .args(["build", "--release", "--target=wasm32-unknown-unknown"])
         .status()
         .await?;
 
@@ -221,7 +221,7 @@ async fn run_backend_dev() -> Result<(), DynError> {
     let backend = project_root().join("core/backend");
     let status = Command::new(cargo)
         .current_dir(backend)
-        .args(&["build"])
+        .args(["build"])
         .status()
         .await?;
 
@@ -236,7 +236,7 @@ async fn run_backend_dev() -> Result<(), DynError> {
 
     Command::new(dst)
         .current_dir(dev_dir())
-        .args(&["build"])
+        .args(["build"])
         .status()
         .await?;
     Ok(())
@@ -276,11 +276,11 @@ async fn run_frontend_dev(_cfg: &Config) -> Result<(), DynError> {
 
     tokio::fs::write(dev_dir().join("Trunk.toml"), toml).await?;
 
-    fs::create_dir_all(&dev_dir().join("static"))?;
+    fs::create_dir_all(dev_dir().join("static"))?;
 
     let status = Command::new("trunk")
         .current_dir(frontend)
-        .args(&[
+        .args([
             "watch",
             "--config",
             dev_dir().join("Trunk.toml").to_str().unwrap(),

@@ -24,12 +24,11 @@ macro_rules! forward_to_row_value_deserializer {
 pub fn from_table<D: serde::de::DeserializeOwned>(table: &Table) -> Result<Vec<D>> {
     let mut items = Vec::new();
     let columns: Vec<String> = table
-        .rows
-        .get(0)
+        .rows.first()
         .map(|s| s.keys().map(|s| s.to_string()).collect())
         .unwrap_or(table.columns.clone());
     for row in table.rows.iter() {
-        let item = D::deserialize(TableRowDeserializer::from_row_with_columns(&row, &columns))?;
+        let item = D::deserialize(TableRowDeserializer::from_row_with_columns(row, &columns))?;
         items.push(item);
     }
     Ok(items)

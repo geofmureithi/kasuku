@@ -17,7 +17,10 @@ use interface::{Plugin, PluginWrapper};
 use kasuku_database::KasukuDatabase;
 use markdown::{IsMatched, MarkdownEvent, MarkdownFile};
 use plugy::runtime::Runtime;
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, DeserializeOwned},
+    Deserialize, Serialize,
+};
 use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
 
@@ -38,6 +41,7 @@ pub struct KasukuRuntime {
     inner: Arc<Runtime<BoxedPlugin, plugy::runtime::Plugin<BackendPlugin>>>,
     config: Config,
     database: KasukuDatabase,
+    context: Context,
 }
 
 impl Deref for KasukuRuntime {
@@ -142,9 +146,10 @@ impl KasukuRuntime {
             .context(Database)
             .context(Debugger);
         for plugin in &config.plugins {
-            let mut annotation = PluginAnnotation::default();
-            annotation.wasm = fs::read(&plugin.uri).unwrap();
-            dbg!(&plugin.name);
+            let annotation = PluginAnnotation {
+                wasm: fs::read(&plugin.uri).unwrap(),
+                ..Default::default()
+            };
             let plugin: PluginWrapper<BackendPlugin, _> = runtime
                 .load_with(BackendPlugin {
                     addr: ctx_actor.clone(),
@@ -184,6 +189,7 @@ impl KasukuRuntime {
             inner: Arc::new(runtime),
             config: config.clone(),
             database: kasuku_database,
+            context: Context,
         })
     }
 }
@@ -266,15 +272,28 @@ async fn update_file(
 
 async fn get_file(
     Path((_vault, filename)): Path<(String, String)>,
-    State(runtime): State<KasukuRuntime>,
+    State(mut runtime): State<KasukuRuntime>,
 ) -> impl IntoResponse {
     let tx = runtime.database.transaction().await;
     #[derive(Debug, Deserialize, Clone)]
     struct Subscription {
-        data: String,
+        #[serde(deserialize_with = "deserialize_json_string")]
+        data: MarkdownEvent,
         plugin: String,
     }
 
+    fn deserialize_json_string<'de, D, T: DeserializeOwned>(deserializer: D) -> Result<T, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let s: String = de::Deserialize::deserialize(deserializer)?;
+        serde_json::from_str(&s).map_err(de::Error::custom)
+    }
+
+    let md = tokio::fs::read_to_string(&filename).await.unwrap();
+    let file = markdown::parse(&md).unwrap();
+
+    
     let subscriptions: Vec<Subscription> = tx
         .query(
             "SELECT s.data, s.plugin FROM subscriptions s WHERE event = 'markdown::MarkdownEvent' ORDER BY s.rowid ASC",
@@ -282,20 +301,13 @@ async fn get_file(
         .await
         .unwrap();
 
-    let md = tokio::fs::read_to_string(&filename).await.unwrap();
-    let file = markdown::parse(&md).unwrap();
+    
     let plugins: Vec<String> = file
         .iter()
         .flat_map(move |event| {
             subscriptions
-                .clone()
                 .iter()
-                .filter(move |filter| {
-                    serde_json::from_str::<MarkdownEvent>(&filter.data)
-                        .unwrap()
-                        .is_matched(event)
-                        .unwrap()
-                })
+                .filter(move |filter| filter.data.is_matched(event).unwrap())
                 .map(|c| c.plugin.clone())
                 .collect::<Vec<_>>()
         })
@@ -303,13 +315,9 @@ async fn get_file(
         .into_iter()
         .collect::<Vec<String>>();
     let mut md: ::types::File = file.try_into().unwrap();
-    for plugin in plugins {
-        dbg!(&plugin);
-        let plugin: PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name(&plugin).unwrap();
-        md = plugin
-            .process_file(&mut ::context::Context::default(), md)
-            .await
-            .unwrap();
+    for plugin in plugins.iter() {
+        let plugin: PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name(plugin).unwrap();
+        md = plugin.process_file(&mut runtime.context, md).await.unwrap();
     }
     tx.commit().await;
 

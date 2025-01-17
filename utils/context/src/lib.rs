@@ -122,7 +122,7 @@ impl Emitter {
             data,
         } = subscription;
         let sql =
-            format!("INSERT INTO subscriptions(plugin, event, event_type, data) VALUES(:plugin, :event, :event_type, :data);");
+            "INSERT INTO subscriptions(plugin, event, event_type, data) VALUES(:plugin, :event, :event_type, :data);".to_string();
         let res = addr
             .database
             .execute_named_params(
@@ -156,11 +156,10 @@ impl Database {
         sql: String,
     ) -> Result<::types::Table, types::Error> {
         let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
-        Ok(addr
-            .database
+        addr.database
             .query_raw(&sql)
             .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?)
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
     pub async fn execute(
@@ -168,11 +167,10 @@ impl Database {
         sql: String,
     ) -> Result<usize, types::Error> {
         let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
-        Ok(addr
-            .database
+        addr.database
             .execute(sql)
             .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?)
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
     pub async fn execute_params(
@@ -181,11 +179,10 @@ impl Database {
         params: Vec<String>,
     ) -> Result<usize, types::Error> {
         let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
-        Ok(addr
-            .database
+        addr.database
             .execute_params(sql, params)
             .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?)
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 }
 
@@ -244,14 +241,14 @@ impl Context {
     }
 }
 
-impl<'de, 'a> Deserialize<'de> for &'a mut Context {
+impl<'de> Deserialize<'de> for &mut Context {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         struct ContextVisitor<'a>(PhantomData<&'a ()>);
 
-        impl<'de, 'a> Visitor<'de> for ContextVisitor<'a> {
+        impl<'a> Visitor<'_> for ContextVisitor<'a> {
             type Value = &'a mut Context;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -266,14 +263,14 @@ impl<'de, 'a> Deserialize<'de> for &'a mut Context {
     }
 }
 
-impl<'de, 'a> Deserialize<'de> for &'a Context {
+impl<'de> Deserialize<'de> for &Context {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         struct ContextVisitor<'a>(PhantomData<&'a ()>);
 
-        impl<'de, 'a> Visitor<'de> for ContextVisitor<'a> {
+        impl<'a> Visitor<'_> for ContextVisitor<'a> {
             type Value = &'a Context;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -281,21 +278,16 @@ impl<'de, 'a> Deserialize<'de> for &'a Context {
             }
 
             fn visit_unit<E>(self) -> Result<Self::Value, E> {
-                Ok(Box::leak(Box::new(Context)))
+                Ok(&Context)
             }
         }
         deserializer.deserialize_unit(ContextVisitor(PhantomData))
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Context;
 
-#[cfg(not(target_arch = "wasm32"))]
-impl Default for Context {
-    fn default() -> Self {
-        Context
-    }
-}
 
 impl Serialize for &Context {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
