@@ -234,6 +234,7 @@ dependencies = [
  "notify",
  "plugy",
  "pulldown-cmark",
+ "runtime",
  "serde",
  "serde_json",
  "tokio",
@@ -1372,6 +1373,7 @@ dependencies = [
  "js-sys",
  "serde",
  "serde_json",
+ "types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -2827,6 +2829,7 @@ dependencies = [
  "pulldown-cmark",
  "regex",
  "serde",
+ "serde_regex",
  "tokio",
  "types",
 ]
@@ -3103,7 +3106,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
- "proc-macro-crate 1.3.1",
+ "proc-macro-crate 2.0.0",
  "proc-macro2",
  "quote",
  "syn 2.0.95",
@@ -4274,6 +4277,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "runtime"
+version = "0.1.0"
+dependencies = [
+ "context",
+ "distribution",
+ "futures",
+ "interface",
+ "kasuku-database",
+ "plugy",
+ "types",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4530,6 +4546,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4beec8bce849d58d06238cb50db2e1c417cfeafa4c63f692b15c82b7c80f8335"
 dependencies = [
  "itoa 1.0.9",
+ "serde",
+]
+
+[[package]]
+name = "serde_regex"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8136f1a4ea815d7eac4101cfd0b16dc0cb5e1fe1b8609dfd728058656b7badf"
+dependencies = [
+ "regex",
  "serde",
 ]
 

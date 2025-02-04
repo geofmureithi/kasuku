@@ -10,7 +10,7 @@ use types::{table::from_table, Error, PluginEvent, Table, ViewType};
 use distribution::PluginAnnotation;
 
 #[cfg(feature = "backend")]
-pub type Addr = std::sync::Arc<backend::GlobalContext>;
+pub type Addr = std::sync::Arc<backend::KasukuState>;
 
 #[derive(Debug, Clone)]
 pub struct BackendPlugin {
@@ -23,7 +23,7 @@ pub struct BackendPlugin {
 }
 
 #[cfg(feature = "backend")]
-pub use backend::GlobalContext;
+pub use backend::KasukuState;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ContextState {
@@ -33,10 +33,15 @@ pub enum ContextState {
 
 #[cfg(feature = "backend")]
 mod backend {
+
+    use std::sync::Arc;
+
     use kasuku_database::KasukuDatabase;
     use plugy::core::PluginLoader;
+    use tokio::sync::RwLock;
+    use types::config::Config;
 
-    use crate::BackendPlugin;
+    use crate::{BackendPlugin, Context};
 
     impl From<BackendPlugin> for plugy::runtime::Plugin<BackendPlugin> {
         fn from(val: BackendPlugin) -> Self {
@@ -59,16 +64,11 @@ mod backend {
         }
     }
 
-    #[derive(Debug)]
-    pub struct GlobalContext {
+    #[derive(Debug, Clone)]
+    pub struct KasukuState {
         pub database: KasukuDatabase,
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    impl GlobalContext {
-        pub fn new(database: KasukuDatabase) -> Self {
-            GlobalContext { database }
-        }
+        pub config: Arc<Config>,
+        pub context: Arc<RwLock<Context>>,
     }
 }
 
@@ -145,6 +145,13 @@ impl Emitter {
     ) -> String {
         url
     }
+
+    // pub async fn ask(
+    //     _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+    //     plugin: &str,
+    //     message: Event,
+    // ) -> Result<Event, types::Error> {
+    // }
 }
 
 pub struct Database;
@@ -216,17 +223,20 @@ impl Context {
     }
 
     pub fn query<Res: DeserializeOwned>(&self, sql: &str) -> Result<Vec<Res>, Error> {
+        debug!("{}", sql);
         let table = database::sync::Database::query(sql.to_owned())?;
         let items = from_table(&table)?;
         Ok(items)
     }
 
     pub fn query_raw(&self, sql: &str) -> Result<Table, Error> {
+        debug!("{}", sql);
         let table = database::sync::Database::query(sql.to_owned())?;
         Ok(table)
     }
 
     pub fn execute(&mut self, sql: &str) -> Result<usize, Error> {
+        debug!("{}", sql);
         let count = database::sync::Database::execute(sql.to_owned())?;
         Ok(count)
     }
@@ -236,6 +246,7 @@ impl Context {
     }
 
     pub fn execute_params(&mut self, sql: &str, params: Vec<String>) -> Result<usize, Error> {
+        debug!("{}", sql);
         let count = database::sync::Database::execute_params(sql.to_owned(), params)?;
         Ok(count)
     }
@@ -285,7 +296,7 @@ impl<'de> Deserialize<'de> for &Context {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default)]
 pub struct Context;
 
 impl Serialize for &Context {

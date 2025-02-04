@@ -1,6 +1,7 @@
 mod tab_view;
 
 use crate::tab_view::TabView;
+use ::types::config::VaultConfig;
 use gloo_net::http::Request;
 use hirola::dom::app::App;
 use hirola::dom::*;
@@ -17,7 +18,9 @@ fn Logo() -> Dom {
 }
 
 #[component]
-fn SideBar() -> Dom {
+fn SideBar(state: SharedState) -> Dom {
+    let vaults = state.vaults.signal_vec_cloned();
+
     html! {
         <aside class="w-full" aria-label="Sidebar" un-cloak="">
             <div class="h-full px-3 py-4">
@@ -55,21 +58,22 @@ fn SideBar() -> Dom {
                 </ul>
                 <ul class="border-t my-2">
                     <h2 class="font-thin font-sans text-gray-700 pt-1">"Vaults"</h2>
+
                     <li>
+
+                    {vaults
+                        .map_render(|item| {
+                                html! {
                         <a
-                            href="/vaults/my-project"
+                            href=format!("/vaults/{}", &item.0)
                             class="flex items-center p-2 text-gray-700 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group"
                         >
                             <span class="i-carbon-directory-domain"></span>
-                            <span class="ms-3">"My Projects"</span>
-                        </a>
-                        <a
-                            href="/vaults/work"
-                            class="flex items-center p-2 text-gray-700 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group"
-                        >
-                            <span class="i-carbon-directory-domain"></span>
-                            <span class="ms-3">"Work"</span>
-                        </a>
+                            <span class="ms-3">{&item.0}</span>
+                        </a> }
+                        })}
+
+
                         <a
                             href="#"
                             class="flex items-center p-2 text-sm text-gray-700 rounded-lg dark:text-white hover:bg-blue-100 dark:hover:bg-blue-700 group"
@@ -247,13 +251,14 @@ fn Nav() -> Dom {
     }
 }
 
-fn home(_: &App<()>) -> Dom {
+fn home(app: &App<SharedState>) -> Dom {
+    let state = app.state().clone();
     html! {
         <>
             <Nav/>
             <div class="grid grid-cols-6">
             <div class="col-span-1 min-width-48 bg-gray-50 dark:bg-gray-800 h-screen overflow-scroll pt-10">
-                <SideBar/>
+                <SideBar state=state/>
             </div>
             <div class="col-span-5 flex h-screen">
                 <div class="flex-1 overflow-scroll pt-14">
@@ -264,9 +269,35 @@ fn home(_: &App<()>) -> Dom {
         </>
     }
 }
+
+pub type SharedState = AppState;
+
+#[derive(Debug, Default, Clone)]
+pub struct AppState {
+    vaults: MutableVec<(String, VaultConfig)>,
+}
 fn main() {
-    let mut app = App::new(());
+    let state = AppState::default();
+    let s = state.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+        let config: ::types::config::Config = Request::get("api/v1/config")
+            .build()
+            .expect("Failed to build request")
+            .send()
+            .await
+            .map_err(|err| err.to_string())
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        s.vaults
+            .lock_mut()
+            .replace_cloned(config.vaults.into_iter().collect::<Vec<_>>());
+    });
+
+    let mut app = App::new(state);
     app.route("/", home);
+    app.route("/vault/:vault", home);
     // app.route("/vault/:vault/:file", home); // View a specific file
     // app.route("/quick/:plugin/:view", home); // Render a specific quick view
     // app.route("/plugins", home); // View plugins

@@ -1,4 +1,6 @@
-use backend::{read_config, KasukuRuntime};
+use backend::read_config;
+use runtime::KasukuRuntime;
+use tokio::join;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -17,5 +19,7 @@ async fn main() {
     let runtime = KasukuRuntime::new(&config)
         .await
         .expect("Could not start the runtime");
-    let _app = backend::app(config.server.port, runtime).await;
+    let indexer = backend::indexer::run_indexer(&runtime);
+    let app = backend::app(&runtime);
+    join!(indexer, app);
 }

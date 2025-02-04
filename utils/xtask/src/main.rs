@@ -2,6 +2,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Stdio,
+    str::FromStr,
 };
 
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
@@ -115,50 +116,84 @@ async fn dev_server() -> Result<(), DynError> {
         },
     );
 
+    config.vaults.insert(
+        "Notes".to_string(),
+        VaultConfig {
+            mount: PathBuf::from_str("/Users/geoffreymureithi/Projects/obsidian-notes-main")
+                .unwrap(),
+            plugins: Default::default(),
+        },
+    );
+
     fs::create_dir_all(dev_dir().join("vault"))?;
 
     let test_markdown = r###"    
-# Daily Task Template
+# \[🏠\] Dashboard
 
-**Date:** ___
+Welcome to your Kasuku workspace! This landing page provides an at-a-glance overview of your vault, quick access to key notes, and integration with useful plugins to streamline your workflow.
 
-## Schedule
-| Time   | Task     |
-|--------|----------|
-| 6-7 AM |          |
-| 7-8 AM |          |
-| 8-9 AM |          |
-| 9-10 AM|          |
-| 10-11 AM|         |
-| 11-12 PM|         |
-| 12-1 PM|          |
-| 1-2 PM |          |
-| 2-3 PM |          |
-| 3-4 PM |          |
-| 4-5 PM |          |
-| 5-6 PM |          |
-| 6-7 PM |          |
-| 7-8 PM |          |
-| 8-9 PM |          |
-| 9-10 PM|          |
+## Task & Project Management
+- **High Priority Tasks** (via Tasks Plugin):
+    ```sql,tasklist
+    SELECT * from tasks WHERE completed = false LIMIT 10
+    ```
+    > This code block will automatically display your open tasks with high priority.
 
-## Main Tasks
-- [ ] One
-- [ ] Two
-- [ ] Three
+- **Project Overview**:
+    - [[Project X Overview]]
+    - [[Project Y Roadmap]]
+    - [[Pending Reviews]]
 
-## Additional Tasks
-- [ ] Minor
-- [ ] Major
-- [ ] semver
+- **To Do**:
+    ```sql,tasklist
+    SELECT * from tasks WHERE completed = false LIMIT 10
+    ```
+    > Example: Show tasks specifically tagged for `#projectX`.
 
-## Notes created today
-```sql,dataview
-SELECT data, plugin FROM subscriptions WHERE EXISTS ( SELECT 1 FROM json_each(data) AS keys WHERE keys.key IN ('CodeBlock', 'InlineCode', 'OtherKey1', 'OtherKey2')) AND event = 'markdown::MarkdownEvent'
+---
+## Reading & Reference
+- **Knowledge Base Index**: [[Knowledge Index]]  
+  A collection of reference materials, tutorials, and reading lists.
+- **Research Articles**: Gather interesting articles or references in [[Reading List]].
+- **Books to Read**: [[Bookshelf]]  
+
+> Tip: Use tags like `#reading` or `#booknotes` to categorize reading-related items.
+
+---
+## Dataview Queries
+> For users with the Dataview Plugin, you can create custom queries to display notes in a dynamic way.
+
+- **All Notes with #idea Tag**:
+    ```sql,dataview
+    SELECT * FROM entries LIMIT 10;
+    ```
+- **Table of Recently Modified Notes**:
+    ```sql,dataview
+    SELECT event as "Event", data as "json:Data" FROM subscriptions LIMIT 10;
+    ```
+
+These examples can be expanded or modified to create more elaborate dashboards.  
+
+---
+## Kanban Board
+> Utilize the Kanban Plugin to visually track progress.
+
+**Project Kanban**: [[Project Board]]
+
+Example snippet inside your Kanban board:
+```kanban
+## Backlog
+- Research ideas
+- Initial brainstorming
+
+## In Progress
+- Outline project scope
+- Draft first chapter
+
+## Completed
+- Project planning
+- Requirement gathering
 ```
-
-## Notes
-- Blah blah blah 
     "###;
 
     fs::write(dev_dir().join("vault/test.md"), test_markdown)?;

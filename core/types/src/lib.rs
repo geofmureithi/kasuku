@@ -128,8 +128,9 @@ pub struct PluginSubscription {
 #[derive(Debug, Serialize, Deserialize)]
 
 pub struct FilePath {
+    pub filename: String,
     pub vault: String,
-    pub file: PathBuf,
+    pub path: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
