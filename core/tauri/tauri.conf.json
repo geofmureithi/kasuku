@@ -1,22 +1,31 @@
 {
-    "build": {
-      "distDir": "../../"
-    },
-    "tauri": {
-      "bundle": {
-        "identifier": "studio.tauri.hello_tauri_webdriver",
-        "icon": ["icon.png"]
-      },
-      "allowlist": {
-        "all": false
-      },
-      "windows": [
-        {
-          "width": 800,
-          "height": 600,
-          "resizable": true,
-          "fullscreen": false
-        }
-      ]
+  "productName": "Kasuku",
+  "version": "0.1.0",
+  "identifier": "io.kasuku.app",
+  "build": {
+    "beforeDevCommand": "cargo xtask dev",
+    "devUrl": "http://localhost:8080",
+    "beforeBuildCommand": "echo build",
+    "frontendDist": "../../target/dev/static"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Kasuku",
+        "width": 800,
+        "height": 600
+      }
+    ],
+    "security": {
+      "csp": null
     }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ]
   }
+}

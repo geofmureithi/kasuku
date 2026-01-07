@@ -1,10 +1,16 @@
-mod graphql;
 mod tab_view;
 
 use crate::tab_view::TabView;
+use ::types::config::VaultConfig;
+use gloo_net::http::Request;
 use hirola::dom::app::App;
 use hirola::dom::*;
 use hirola::prelude::*;
+use web_sys::window;
+
+pub struct State {
+    // config: Config,
+}
 
 #[component]
 fn Logo() -> Dom {
@@ -12,10 +18,12 @@ fn Logo() -> Dom {
 }
 
 #[component]
-fn SideBar() -> Dom {
+fn SideBar(state: SharedState) -> Dom {
+    let vaults = state.vaults.signal_vec_cloned();
+
     html! {
-        <aside class="fixed top-0 left-0 z-40 w-64 h-screen pt-14" aria-label="Sidebar" un-cloak="">
-            <div class="h-full px-3 py-4 overflow-y-auto bg-gray-50 dark:bg-gray-800">
+        <aside class="w-full" aria-label="Sidebar" un-cloak="">
+            <div class="h-full px-3 py-4">
                 <ul class="space-2 font-medium">
                     <li>
                         <a
@@ -50,21 +58,22 @@ fn SideBar() -> Dom {
                 </ul>
                 <ul class="border-t my-2">
                     <h2 class="font-thin font-sans text-gray-700 pt-1">"Vaults"</h2>
+
                     <li>
+
+                    {vaults
+                        .map_render(|item| {
+                                html! {
                         <a
-                            href="/vaults/my-project"
+                            href=format!("/vaults/{}", &item.0)
                             class="flex items-center p-2 text-gray-700 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group"
                         >
                             <span class="i-carbon-directory-domain"></span>
-                            <span class="ms-3">"My Projects"</span>
-                        </a>
-                        <a
-                            href="/vaults/work"
-                            class="flex items-center p-2 text-gray-700 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group"
-                        >
-                            <span class="i-carbon-directory-domain"></span>
-                            <span class="ms-3">"Work"</span>
-                        </a>
+                            <span class="ms-3">{&item.0}</span>
+                        </a> }
+                        })}
+
+
                         <a
                             href="#"
                             class="flex items-center p-2 text-sm text-gray-700 rounded-lg dark:text-white hover:bg-blue-100 dark:hover:bg-blue-700 group"
@@ -98,29 +107,31 @@ fn SideBar() -> Dom {
     }
 }
 
-#[wasm_bindgen::prelude::wasm_bindgen]
-extern "C" {
-    fn createTipTapEditor(element: &str, content: &str) -> u32;
-}
-
 #[component]
 fn MarkdownPage() -> Dom {
     let fut = async {
-        graphql::render_file(
-            "/home/geoff/Documents/kasuku/Tasks/apalis/v0.5/2023-07-28.md".to_string(),
-            None,
-        )
-        .await
-        .map(|page| {
-            let _editor = createTipTapEditor("content", &page.render_file);
-        })
-        .unwrap();
+        let response = Request::get("/api/v1/vaults/Default/file/vault/test.md")
+            .build()
+            .expect("Failed to build request")
+            .send()
+            .await
+            .map_err(|err| err.to_string())
+            .unwrap()
+            .text()
+            .await;
+
+        let element = window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .get_element_by_id("content")
+            .unwrap();
+        element.set_inner_html(&response.unwrap());
     };
     html! {
         <>
             <TabView/>
-            <div class="menu-1"><button class="h-8 w-8 i-gridicons-heading-h1">"H1"</button></div>
-            <article use:future={fut} id="content" un-cloak="">
+            <article class="text-base prose prose-truegray container mx-auto p-4 pt-8" use:future={fut} id="content" un-cloak="">
             </article>
 
         </>
@@ -130,7 +141,7 @@ fn MarkdownPage() -> Dom {
 fn Nav() -> Dom {
     html! {
         <nav
-            class="fixed top-0 z-50 w-full bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+            class="z-50 top-0 fixed w-full bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700"
             un-cloak=""
         >
             <div class="px-3 py-3 lg:px-5 lg:pl-3">
@@ -240,18 +251,53 @@ fn Nav() -> Dom {
     }
 }
 
-fn home(_: &App<()>) -> Dom {
+fn home(app: &App<SharedState>) -> Dom {
+    let state = app.state().clone();
     html! {
         <>
             <Nav/>
-            <SideBar/>
-            <MarkdownPage/>
+            <div class="grid grid-cols-6">
+            <div class="col-span-1 min-width-48 bg-gray-50 dark:bg-gray-800 h-screen overflow-scroll pt-10">
+                <SideBar state=state/>
+            </div>
+            <div class="col-span-5 flex h-screen">
+                <div class="flex-1 overflow-scroll pt-14">
+                    <MarkdownPage/>
+                </div>
+            </div>
+            </div>
         </>
     }
 }
+
+pub type SharedState = AppState;
+
+#[derive(Debug, Default, Clone)]
+pub struct AppState {
+    vaults: MutableVec<(String, VaultConfig)>,
+}
 fn main() {
-    let mut app = App::new(());
+    let state = AppState::default();
+    let s = state.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+        let config: ::types::config::Config = Request::get("api/v1/config")
+            .build()
+            .expect("Failed to build request")
+            .send()
+            .await
+            .map_err(|err| err.to_string())
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        s.vaults
+            .lock_mut()
+            .replace_cloned(config.vaults.into_iter().collect::<Vec<_>>());
+    });
+
+    let mut app = App::new(state);
     app.route("/", home);
+    app.route("/vault/:vault", home);
     // app.route("/vault/:vault/:file", home); // View a specific file
     // app.route("/quick/:plugin/:view", home); // Render a specific quick view
     // app.route("/plugins", home); // View plugins

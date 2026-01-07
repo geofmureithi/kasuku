@@ -39,7 +39,7 @@ pub struct Config {
     pub package: Package,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct PluginAnnotation {
     pub name: String,
     pub identifier: String,

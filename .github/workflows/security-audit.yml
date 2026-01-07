@@ -1,14 +1,17 @@
 name: Security audit
 on:
   push:
-    paths: 
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
 jobs:
   security_audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: actions-rs/audit-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

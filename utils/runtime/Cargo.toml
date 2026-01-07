@@ -1,0 +1,16 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+types = { path = "../../core/types" }
+context = { path = "../context" }
+distribution = { path = "../distribution" }
+kasuku-database = { path = "../database" }
+interface = { path = "../../core/interface" }
+plugy = { git = "https://github.com/geofmureithi/plugy.git", branch = "chore/msgpack-codec", default-features = false, features = [
+    "runtime",
+    "macros",
+] }
+futures = "0.3"

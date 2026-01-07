@@ -1,10 +1,10 @@
 mod card;
 
-use context::Context;
+use crate::card::TaskCard;
+use context::{debug, Context};
 use hirola::prelude::*;
 use interface::Plugin;
-use macros::FromSelect;
-use markdown::{AsMarkdown, MarkdownEvent};
+use markdown::{MarkdownEvent, MarkdownFile};
 use plugy::macros::plugin_impl;
 use serde::{Deserialize, Serialize};
 use types::{Error, Event, File, PluginEvent, Rsx};
@@ -27,7 +27,7 @@ impl PluginEvent for TaskEvent {
     type Plugin = Tasks;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, FromSelect)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
     title: String,
     completed: bool,
@@ -44,38 +44,50 @@ impl Task {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Subscription {
+    plugin: String,
+    event: String,
+    event_type: String,
+    r#type: String,
+}
+
 #[plugin_impl]
 impl Plugin for Tasks {
     fn on_load(&self, ctx: &mut Context) -> Result<(), Error> {
+        debug!("Initializing Tasks plugin");
+        let version = ctx.version();
+        debug!("Running on version {version}");
         ctx.subscribe(&TaskEvent::Add)?;
         ctx.subscribe(&MarkdownEvent::TaskList)?;
+        let res: Vec<Subscription> =
+            ctx.query("SELECT event, event_type, json_extract (data, '$.type') as type, plugin from subscriptions")?;
+        debug!("{:?}", res);
         ctx.execute(
-            "CREATE TABLE IF NOT EXISTS tasks (
+            "CREATE TABLE tasks (
                 title TEXT NOT NULL,
                 completed BOOLEAN NOT NULL,
                 source TEXT,
-                due DATE,
+                due DATE
             );",
         )?;
         Ok(())
     }
 
     fn process_file(&self, ctx: &mut Context, file: File) -> Result<File, Error> {
-        let path = &file.path;
-        ctx.execute(&format!("DELETE FROM tasks WHERE source = '{path}';"))?;
-        let md = file.data.to_markdown()?;
-
-        let events = md.get_contents();
-
-        for (index, event) in events.iter().enumerate() {
+        debug!("Handling File");
+        let path = "&file.path";
+        // ctx.execute::<usize>(&format!("DELETE FROM tasks WHERE source = '{path}';"))?;
+        let md: MarkdownFile = (&file).try_into()?;
+        debug!("got file");
+        for (index, event) in md.iter().enumerate() {
             if let markdown::Event::TaskListMarker(state) = event {
-                let next = events.get(index + 1);
+                let next = md.get(index + 1);
                 if let Some(markdown::Event::Text(text)) = next {
                     ctx.execute(&format!("INSERT INTO tasks(title, completed, source) VALUES('{text}', {state}, '{path}');"))?;
                 }
             }
         }
-
         Ok(file)
     }
 
@@ -84,12 +96,7 @@ impl Plugin for Tasks {
     }
 
     fn render(&self, ctx: &Context, _ev: Event) -> Result<Rsx, Error> {
-        let tasks: Vec<Task> = ctx
-            .query("Select * from tasks")?
-            .first()
-            .cloned()
-            .map(|payload| payload.try_into().unwrap())
-            .unwrap();
+        let tasks: Vec<Task> = ctx.query("Select * from tasks")?;
         let len = tasks.len();
         let node: node::Node = html! {
             <>
@@ -98,7 +105,10 @@ impl Plugin for Tasks {
                 {
                     for task in tasks {
                         html! {
-                            <li data-completed={task.completed} data-source={task.source.unwrap_or("none".to_string())}>{task.title}</li>
+                            <>
+                                <li data-completed={task.completed} data-source={task.source.unwrap_or("none".to_string())}>{task.title}</li>
+                                <TaskCard/>
+                            </>
                         }
                     }
                 }

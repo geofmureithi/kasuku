@@ -2,16 +2,19 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-
-use backend::app;
-
 struct Port(u16);
 
 fn main() {
-    let port = portpicker::pick_unused_port().expect("failed to find unused port");
-    tauri::async_runtime::spawn(app(port));
+    // let runtime = tauri::async_runtime::block_on(async {
+    //     let config = backend::read_config();
+    //     let runtime = KasukuRuntime::new(&config).await.unwrap();
+    //     runtime
+    // });
+    // tauri::async_runtime::spawn(async move {
+    //     app(8080, runtime).await;
+    // });
     tauri::Builder::default()
-        .manage(Port(port))
+        .manage(Port(8080))
         .invoke_handler(tauri::generate_handler![get_port])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

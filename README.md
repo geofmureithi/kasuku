@@ -4,12 +4,13 @@ Kasuku is lightweight, extensible all-in-one planning tool that makes every day 
 
 ## Features 🌟
 
-- **Efficient & Lightweight**: Built in Rust with a low memory footprint and light plugins.
+- **Efficient & Lightweight**: Built with Rust and WASM with a low memory footprint and light plugins.
 - **Cross-Platform**: Runs smoothly on Web, Mobile, and Desktop.
 - **Customizable**: Extend functionality with Rust-based plugins compiled into WASM.
-- **Dynamic SQL Engine**: Powerful data management with an inbuilt SQL engine.
+- **Dynamic SQL Engine**: Powerful data management with an inbuilt SQL engine based on sqlite.
 
-## Ready plugins 🎉
+
+## In Progress plugins 🎉
 
 ### 📝 Tasks
 
@@ -25,49 +26,76 @@ Say goodbye to monotony. Automate with templates and free up time for the fun st
 
 ## But Wait, There's More! 🚀 Upcoming Plugins:
 
-### 🌐 Web Clipper
-
-Soon, you'll be able to snag bits of the web directly into Kasuku. Research, resources, inspirations—clip it all!
-
 ### 📊 Dashboard
 
-Visualize your progress with customizable dashboards. See your productivity soar in vibrant charts and graphs.
+Visualize your progress with customizable dashboards.
+
+### 📅 Calendar
+
+Seamlessly integrate with your favorite calendars
+
+## Help us Build
+
+### 🧠 Mind Mapper
+
+Create a plugin that can generate a mind map
+
+### 🌐 Web Clipper
+
+Allow the ability to clip from the web into a Kasuku file
 
 ### 🕹️ Gamify
 
 Turn tasks into a game. Earn points, level up, and make productivity an adventure.
 
-### 📅 Calendar Sync
-
-Seamlessly integrate with your favorite calendars. Never miss a beat, meeting, or milestone.
-
-### 🧠 Mind Mapper
-
-Brainstorming made beautiful. Organize thoughts, ideas, and plans in visually stunning mind maps.
-
-Stay tuned for these exciting additions! With Kasuku, your productivity journey just keeps getting better. ✨
-
 ## Installation
+
+Check the Releases page for ready made binaries.
+
+## Development
 
 1. Clone this repository: `git clone https://github.com/geofmureithi/kasuku.git`
 
 2. Navigate to the project directory: `cd kasuku`
 
-3. Build and run the backend: `cargo run -p backend`
+3. Build and run the backend: `cargo xtask dev`
 
-4. Build and run the frontend: `trunk serve`
+4. Open your web browser and go to: `http://localhost:8080`
 
-5. Open your web browser and go to: `http://localhost:8000`
+## Roadmap
 
-## Usage
+### Core
+- [x] Plugin Interface API
+- [x] Context APi
+- [x] Robust and dynamic SQL Engine
+- [x] Markdown parsing
+- [ ] LLM integration
+- [ ] Cross plugin communication
+- [ ] Plugin distribution via OCI
 
-1. Upon opening Kasuku, you'll be greeted with a clean and intuitive interface.
+### Backend
+- [x] Basic REST API
+- [ ] Indexing files
+- [ ] Document API
 
-2. Navigate through the various plugins using the easy-to-use navigation bar.
+### Frontend
+- [x] Basic UI
+- [ ] Listing entries
+- [ ] Single view
+- [ ] Extensible UI
+- [ ] Dashboard
+- [ ] Block editor using *edita*
+- [ ] Live-view integration with plugins
 
-3. Create, manage, and interact with your tasks, notes, fitness logs, financial records, files, schedule, and personal growth goals.
+### Tauri
+- [x] Basic setup
+- [ ] Use random port
+- [ ] Setup CI to produce binaries
 
-4. Ability to install custom plugins all powered by WebAssembly technology.
+### Plugins
+- [x] Tasks
+- [x] DataView
+- [ ] Templating
 
 ## Contributing
 

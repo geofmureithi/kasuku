@@ -1,224 +1,54 @@
-mod mutation;
-pub mod query;
-
-use async_graphql::{http::GraphiQLSource, EmptySubscription, Schema};
-use async_graphql_axum::GraphQL;
-use async_walkdir::{Filtering, WalkDir};
+pub mod indexer;
 use axum::{
-    http::Method,
+    extract::{Path, State},
+    http::StatusCode,
     response::{Html, IntoResponse},
     routing::get,
-    Extension, Json, Router,
+    Json, Router,
 };
-use context::{BackendPlugin, Context, Database, Debugger, Emitter, Fetcher, GlobalContext, Query};
-use interface::{Plugin, PluginWrapper};
-use kasuku_database::{prelude::Glue, KasukuDatabase};
-use plugy::runtime::Runtime;
-
-use std::{
-    net::SocketAddr,
-    ops::Deref,
-    sync::{Arc, Mutex},
+use context::BackendPlugin;
+use figment::{
+    providers::{Env, Format, Toml},
+    Figment,
 };
-use tower_http::cors::{Any, CorsLayer};
-use types::{config::Config, UserInfo};
-use xtra::Mailbox;
+use interface::PluginWrapper;
+use markdown::{IsMatched, MarkdownEvent, MarkdownFile};
+use runtime::KasukuRuntime;
+use serde::{
+    de::{self, DeserializeOwned},
+    Deserialize,
+};
+use std::net::SocketAddr;
+use tokio::io::AsyncWriteExt;
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
+use types::{config::Config, FilePath, UserInfo};
 
-use crate::{mutation::MutationRoot, query::QueryRoot};
-
-pub type BoxedPlugin = Box<dyn Plugin>;
-
-#[derive(Debug, Clone)]
-pub struct KasukuContext;
-
-#[derive(Clone)]
-pub struct KasukuRuntime {
-    inner: Arc<Runtime<BoxedPlugin, plugy::runtime::Plugin<BackendPlugin>>>,
-    config: Config,
-    database: Arc<Mutex<Glue<KasukuDatabase>>>,
-}
-
-impl Deref for KasukuRuntime {
-    type Target = Arc<Runtime<BoxedPlugin, plugy::runtime::Plugin<BackendPlugin>>>;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl KasukuRuntime {
-    pub async fn new(config: Config) -> Result<Self, types::Error> {
-        use futures::FutureExt;
-        let kasuku_database = KasukuDatabase::open(&config.internals.database_path)
-            .then(|res| async {
-                if res.is_err() {
-                    let new_db = KasukuDatabase::new(&config.internals.database_path)
-                        .await
-                        .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
-                    new_db
-                        .save()
-                        .await
-                        .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
-                    return Ok(new_db);
-                }
-                res.map_err(|err| types::Error::DatabaseError(err.to_string()))
-            })
-            .await
-            .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
-        let mut glue_db = Glue::new(kasuku_database);
-        glue_db
-            .execute(
-                "DROP TABLE IF EXISTS subscriptions;
-                DROP TABLE IF EXISTS vaults;
-                DROP TABLE IF EXISTS entries;
-                DROP TABLE IF EXISTS tasks;
-                CREATE TABLE IF NOT EXISTS subscriptions (
-                    plugin TEXT NOT NULL,
-                    event TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    data TEXT
-                );
-                CREATE TABLE IF NOT EXISTS vaults (
-                    name TEXT NOT NULL PRIMARY KEY,
-                    mount TEXT NOT NULL,
-                ); 
-                CREATE TABLE IF NOT EXISTS entries (
-                    path TEXT NOT NULL PRIMARY KEY,
-                    vault TEXT NOT NULL,
-                    last_modified INTEGER,
-                    meta TEXT
-                )",
-            )
-            .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
-
-        let db = Arc::new(Mutex::new(glue_db));
-        let ctx_actor = xtra::spawn_tokio(GlobalContext::new(db.clone()), Mailbox::bounded(100));
-        let runtime = Runtime::new().unwrap();
-        let runtime = runtime
-            .context(Fetcher)
-            .context(Emitter)
-            .context(Database)
-            .context(Debugger);
-        for plugin in &config.plugins {
-            let plugin: PluginWrapper<BackendPlugin, _> = runtime
-                .load_with(BackendPlugin {
-                    addr: ctx_actor.clone(),
-                    name: plugin.name.clone(),
-                    uri: plugin.uri.clone(),
-                    meta: distribution::load_package(&plugin.uri)
-                        .await
-                        .map_err(|err| types::Error::PluginError(err.to_string()))?,
-                })
-                .await
-                .unwrap();
-            plugin.on_load(Context::acquire()).await?;
-        }
-
-        let act = ctx_actor.clone();
-        let mv_act = ctx_actor.clone();
-        for (vault, vault_config) in config.vaults.clone() {
-            let mount = vault_config.mount.clone();
-            let _res = act
-                .send(Query(format!(
-                    "INSERT INTO vaults(name, mount) VALUES ('{vault}', '{}')",
-                    mount.to_str().ok_or(types::Error::Serialization(
-                        "Invalid vault name".to_string()
-                    ))?
-                )))
-                .await
-                // .map_err(|err| types::Error::DatabaseError(err.to_string()))?
-                .map_err(|err| types::Error::DatabaseError(err.to_string()))?;
-            let mv_act = mv_act.clone();
-            tokio::spawn(async move {
-                use futures::stream::StreamExt;
-                let mut entries = WalkDir::new(mount).filter(|entry| async move {
-                    if let Some(true) = entry
-                        .path()
-                        .file_name()
-                        .map(|f| f.to_string_lossy().starts_with('.'))
-                    {
-                        return Filtering::IgnoreDir;
-                    }
-                    if let Some(true) = entry
-                        .path()
-                        .file_name()
-                        .map(|f| f.to_string_lossy().ends_with(".md"))
-                    {
-                        return Filtering::Continue;
-                    }
-                    Filtering::Ignore
-                });
-                let mv_act = mv_act.clone();
-                loop {
-                    match entries.next().await {
-                        Some(Ok(entry)) => {
-                            let _res = mv_act
-                                .send(Query(format!(
-                                    "INSERT INTO entries(path, vault) VALUES('{}', '{}')",
-                                    entry.path().display(),
-                                    vault
-                                )))
-                                .await;
-                        }
-                        Some(Err(e)) => {
-                            eprintln!("error: {}", e);
-                            break;
-                        }
-                        None => break,
-                    }
-                }
-            });
-        }
-        Ok(KasukuRuntime {
-            inner: Arc::new(runtime),
-            config,
-            database: db,
-        })
-    }
-}
-
-async fn graphiql() -> impl IntoResponse {
-    Html(
-        GraphiQLSource::build()
-            .endpoint("/")
-            .subscription_endpoint("/ws")
-            .finish(),
-    )
-}
-
-pub async fn app<D: Send + Sync + Clone + 'static>(port: u16, data: D) {
-    // Setup graphql schema
-    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-        .data(data.clone())
-        .finish();
-    // Setup ws subscriptions
-
+pub async fn app(runtime: &KasukuRuntime) {
     let app = Router::new()
         .route("/user", get(user_handler))
         .route("/api/v1/config", get(get_config))
         .route(
-            "/",
-            get(graphiql).post_service(GraphQL::new(schema.clone())),
+            "/api/v1/vaults/{vault}/file/{*filename}",
+            get(get_file).put(update_file),
         )
-        .layer(CorsLayer::new().allow_origin(Any).allow_methods(vec![
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::PATCH,
-            Method::DELETE,
-        ]))
-        .layer(Extension(data));
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    println!("Backend is listening on http://{}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+        .route("/api/v1/vaults/{vault}", get(list_files))
+        .fallback_service(
+            ServeDir::new("static").not_found_service(ServeFile::new("static/index.html")),
+        )
+        .with_state(runtime.clone());
+    let addr = SocketAddr::from(([127, 0, 0, 1], runtime.state.config.server.port));
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    tracing::debug!("listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app.layer(TraceLayer::new_for_http()))
         .await
         .unwrap();
 }
 
-async fn get_config(state: Extension<KasukuRuntime>) -> impl IntoResponse {
-    // let dom = Dom::new();
-    Json(state.config.clone())
+async fn get_config(runtime: State<KasukuRuntime>) -> impl IntoResponse {
+    Json(runtime.state.config.clone())
 }
 
 async fn user_handler() -> impl IntoResponse {
@@ -227,4 +57,129 @@ async fn user_handler() -> impl IntoResponse {
         name: "Backend user".to_owned(),
     };
     Json(user)
+}
+
+/// Payload for updating a file (we expect a JSON body with a "content" field)
+#[derive(Debug, Deserialize)]
+struct UpdateFile {
+    content: String,
+}
+
+/// Handler that overwrites the contents of a specific `.md` file.
+/// - `filename` is the name of the file
+/// - Expects a JSON body with `{ "content": "...new markdown contents..." }`
+async fn update_file(
+    Path(filename): Path<String>,
+    State(_state): State<KasukuRuntime>,
+    Json(payload): Json<UpdateFile>,
+) -> impl IntoResponse {
+    // let file_path = state.base_dir.join(&filename);
+    let file_path = filename;
+
+    // Create the file if it doesn't exist, or truncate it if it does.
+    match tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&file_path)
+        .await
+    {
+        Ok(mut file) => {
+            if let Err(e) = file.write_all(payload.content.as_bytes()).await {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to write file: {}", e),
+                )
+                    .into_response();
+            }
+            (StatusCode::OK, "File updated successfully").into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to create or open file: {}", e),
+        )
+            .into_response(),
+    }
+}
+
+async fn get_file(
+    Path((_vault, filename)): Path<(String, String)>,
+    State(runtime): State<KasukuRuntime>,
+) -> impl IntoResponse {
+    let tx = runtime.state.database.transaction().await;
+    #[derive(Debug, Deserialize, Clone)]
+    struct Subscription {
+        #[serde(deserialize_with = "deserialize_json_string")]
+        data: MarkdownEvent,
+        plugin: String,
+    }
+
+    fn deserialize_json_string<'de, D, T: DeserializeOwned>(deserializer: D) -> Result<T, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let s: String = de::Deserialize::deserialize(deserializer)?;
+        serde_json::from_str(&s).map_err(de::Error::custom)
+    }
+
+    let md = tokio::fs::read_to_string(&filename).await.unwrap();
+    let file = markdown::parse(&md).unwrap();
+
+    let subscriptions: Vec<Subscription> = tx
+        .query(
+            "SELECT s.data, s.plugin FROM subscriptions s WHERE event = 'markdown::MarkdownEvent' ORDER BY s.rowid ASC",
+        )
+        .await
+        .unwrap();
+
+    let plugins: Vec<String> = file
+        .iter()
+        .flat_map(move |event| {
+            subscriptions
+                .iter()
+                .filter(move |filter| filter.data.is_matched(event).unwrap())
+                .map(|c| c.plugin.clone())
+                .collect::<Vec<_>>()
+        })
+        .collect::<std::collections::HashSet<String>>()
+        .into_iter()
+        .collect::<Vec<String>>();
+    let mut md: ::types::File = file.try_into().unwrap();
+    for plugin in plugins.iter() {
+        let plugin: PluginWrapper<BackendPlugin, _> = runtime.get_plugin_by_name(plugin).unwrap();
+        let mut ctx = runtime.state.context.write().await;
+        md = plugin.process_file(&mut ctx, md).await.unwrap();
+    }
+    tx.commit().await;
+
+    let mut buf = String::new();
+    let md: MarkdownFile = (&md).try_into().unwrap();
+
+    markdown::cmark::html::push_html(&mut buf, md.events.into_iter());
+
+    Html(buf)
+}
+
+/// Handler that lists all `.md` files inside the vault.
+async fn list_files(
+    Path(vault): Path<String>,
+    State(runtime): State<KasukuRuntime>,
+) -> impl IntoResponse {
+    let files: Vec<FilePath> = runtime
+        .state
+        .database
+        .query_params("SELECT * FROM entries where vault = :1", [vault])
+        .await
+        .unwrap();
+
+    Json(files)
+}
+
+pub fn read_config() -> Config {
+    let config: Config = Figment::new()
+        .merge(Toml::file("Kasuku.toml"))
+        .merge(Env::prefixed("KASUKU_"))
+        .extract()
+        .unwrap();
+    config
 }

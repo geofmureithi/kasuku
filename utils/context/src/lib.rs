@@ -1,15 +1,16 @@
-pub mod payload;
-
-use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{
+    de::{DeserializeOwned, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 use std::{any::type_name, fmt, marker::PhantomData};
 
-use types::{Error, PluginEvent, ViewType};
+use types::{table::from_table, Error, PluginEvent, Table, ViewType};
 
 #[cfg(feature = "backend")]
 use distribution::PluginAnnotation;
 
 #[cfg(feature = "backend")]
-pub type Addr = xtra::Address<backend::GlobalContext>;
+pub type Addr = std::sync::Arc<backend::KasukuState>;
 
 #[derive(Debug, Clone)]
 pub struct BackendPlugin {
@@ -20,29 +21,27 @@ pub struct BackendPlugin {
     #[cfg(feature = "backend")]
     pub meta: PluginAnnotation,
 }
-#[derive(Debug)]
-pub struct Query(pub String);
 
 #[cfg(feature = "backend")]
-pub use backend::GlobalContext;
+pub use backend::KasukuState;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(C)]
 pub enum ContextState {
-    Ref = 1,
-    RefMut = 2,
+    Ref,
+    RefMut,
 }
 
 #[cfg(feature = "backend")]
 mod backend {
-    use std::sync::{Arc, Mutex};
 
-    use async_trait::async_trait;
-    use kasuku_database::{prelude::Glue, KasukuDatabase};
+    use std::sync::Arc;
+
+    use kasuku_database::KasukuDatabase;
     use plugy::core::PluginLoader;
-    use xtra::Handler;
+    use tokio::sync::RwLock;
+    use types::config::Config;
 
-    use crate::{payload::Payload, BackendPlugin, Query};
+    use crate::{BackendPlugin, Context};
 
     impl From<BackendPlugin> for plugy::runtime::Plugin<BackendPlugin> {
         fn from(val: BackendPlugin) -> Self {
@@ -58,41 +57,18 @@ mod backend {
         fn name(&self) -> &'static str {
             Box::leak((self.name.clone()).into_boxed_str())
         }
-        fn bytes(
-            &self,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<u8>, anyhow::Error>>>>
-        {
+        async fn bytes(&self) -> Result<Vec<u8>, anyhow::Error> {
             let data = self.meta.wasm.clone();
 
-            Box::pin(async move { Ok(data) })
+            Ok(data)
         }
     }
 
-    #[async_trait]
-    impl Handler<Query> for GlobalContext {
-        type Return = Result<Vec<Payload>, kasuku_database::prelude::Error>;
-
-        async fn handle(
-            &mut self,
-            sql: Query,
-            _ctx: &mut xtra::Context<Self>,
-        ) -> Result<Vec<Payload>, kasuku_database::prelude::Error> {
-            let conn = &mut self.database;
-            let mut res = conn.lock().unwrap();
-            Ok(res.execute(sql.0)?.into_iter().map(Into::into).collect())
-        }
-    }
-
-    #[derive(xtra::Actor)]
-    pub struct GlobalContext {
-        database: Arc<Mutex<Glue<KasukuDatabase>>>,
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    impl GlobalContext {
-        pub fn new(database: Arc<Mutex<Glue<KasukuDatabase>>>) -> Self {
-            GlobalContext { database }
-        }
+    #[derive(Debug, Clone)]
+    pub struct KasukuState {
+        pub database: KasukuDatabase,
+        pub config: Arc<Config>,
+        pub context: Arc<RwLock<Context>>,
     }
 }
 
@@ -114,10 +90,11 @@ pub struct Debugger;
 #[plugy::macros::context(data = BackendPlugin)]
 impl Debugger {
     pub async fn debug(
-        _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         output: String,
     ) {
-        println!("{output}")
+        let plugin = &caller.data().as_ref().unwrap().plugin.name;
+        tracing::info!("[{plugin}] {output}")
     }
 }
 
@@ -136,20 +113,30 @@ impl Emitter {
     pub async fn subscribe(
         caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         subscription: crate::Subscription,
-    ) -> Result<Vec<crate::payload::Payload>, types::Error> {
+    ) -> Result<usize, types::Error> {
         let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
-        let plugin = &caller.data().as_ref().unwrap().plugin.name;
+        let plugin = caller.data().as_ref().unwrap().plugin.name.to_owned();
         let Subscription {
             event,
             event_type,
             data,
         } = subscription;
         let sql =
-            format!("INSERT INTO subscriptions(plugin, event, event_type, data) VALUES('{plugin}','{event}','{event_type}','{data}');");
-        addr.send(Query(sql))
+            "INSERT INTO subscriptions(plugin, event, event_type, data) VALUES(:plugin, :event, :event_type, :data);".to_string();
+        let res = addr
+            .database
+            .execute_named_params(
+                sql,
+                types::PluginSubscription {
+                    event,
+                    event_type,
+                    data,
+                    plugin,
+                },
+            )
             .await
-            .map_err(|e| Error::PluginError(e.to_string()))?
-            .map_err(|e| Error::DatabaseError(e.to_string()))
+            .map_err(|e| Error::DatabaseError(e.to_string()))?;
+        Ok(res)
     }
 
     pub async fn emit(
@@ -158,6 +145,13 @@ impl Emitter {
     ) -> String {
         url
     }
+
+    // pub async fn ask(
+    //     _caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+    //     plugin: &str,
+    //     message: Event,
+    // ) -> Result<Event, types::Error> {
+    // }
 }
 
 pub struct Database;
@@ -167,42 +161,55 @@ impl Database {
     pub async fn query(
         caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
         sql: String,
-        ctx_state: crate::ContextState,
-    ) -> Result<Vec<crate::payload::Payload>, types::Error> {
-        use kasuku_database::prelude::parse;
-        println!("{sql}");
-        if let ContextState::Ref = ctx_state {
-            let req = parse(&sql).map_err(|e| Error::DatabaseError(e.to_string()))?;
-            if req
-                .iter()
-                .any(|r| !matches!(r, sqlparser::ast::Statement::Query(_)))
-            {
-                return Err(Error::DatabaseError(
-                    "Tried to modify database in non-mutable context. Please use execute()"
-                        .to_owned(),
-                ));
-            }
-        }
+    ) -> Result<::types::Table, types::Error> {
         let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
-        Ok(addr
-            .send(Query(sql))
+        addr.database
+            .query_raw(&sql)
             .await
-            .map_err(|e| Error::PluginError(e.to_string()))?
-            .map_err(|e| Error::DatabaseError(e.to_string()))?
-            .into_iter()
-            .map(Into::into)
-            .collect())
+            .map_err(|e| Error::DatabaseError(e.to_string()))
+    }
+
+    pub async fn execute(
+        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        sql: String,
+    ) -> Result<usize, types::Error> {
+        let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
+        addr.database
+            .execute(sql)
+            .await
+            .map_err(|e| Error::DatabaseError(e.to_string()))
+    }
+
+    pub async fn execute_params(
+        caller: &mut plugy::runtime::Caller<'_, plugy::runtime::Plugin<BackendPlugin>>,
+        sql: String,
+        params: Vec<String>,
+    ) -> Result<usize, types::Error> {
+        let addr = caller.data().as_ref().unwrap().plugin.data.addr.clone();
+        addr.database
+            .execute_params(sql, params)
+            .await
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 }
 
 impl Context {
-    pub fn debug(&self, output: &str) {
+    pub fn debug(output: &str) {
         debugger::sync::Debugger::debug(output.to_string());
     }
-    pub fn fetch(&self, url: &str) -> String {
+    pub fn fetch(url: &str) -> String {
         fetcher::sync::Fetcher::fetch(url.to_string())
     }
     pub fn register_view<W>(&mut self, _view: ViewType, _widget: W) {
+        todo!()
+    }
+
+    pub fn append_script<Script>(&self, _script: Script) {
+        todo!()
+    }
+
+    // Kasuku uses unocss presets?
+    pub fn register_preset<Preset>(&self, _preset: Preset) {
         todo!()
     }
 
@@ -210,31 +217,87 @@ impl Context {
         emitter::sync::Emitter::subscribe(Subscription {
             event: type_name::<E>().to_owned(),
             event_type: type_name::<E::Plugin>().to_owned(),
-            data: serde_json_wasm::to_string(&event)
-                .map_err(|e| Error::Serialization(e.to_string()))?,
+            data: serde_json::to_string(&event).map_err(|e| Error::Serialization(e.to_string()))?,
         })?;
         Ok(())
     }
 
-    pub fn query(&self, sql: &str) -> Result<Vec<crate::payload::Payload>, Error> {
-        let res = database::sync::Database::query(sql.to_owned(), ContextState::Ref)?;
-        Ok(res)
+    pub fn query<Res: DeserializeOwned>(&self, sql: &str) -> Result<Vec<Res>, Error> {
+        debug!("{}", sql);
+        let table = database::sync::Database::query(sql.to_owned())?;
+        let items = from_table(&table)?;
+        Ok(items)
     }
 
-    pub fn execute(&mut self, sql: &str) -> Result<Vec<crate::payload::Payload>, Error> {
-        let res = database::sync::Database::query(sql.to_owned(), ContextState::RefMut)?;
-        Ok(res)
+    pub fn query_raw(&self, sql: &str) -> Result<Table, Error> {
+        debug!("{}", sql);
+        let table = database::sync::Database::query(sql.to_owned())?;
+        Ok(table)
+    }
+
+    pub fn execute(&mut self, sql: &str) -> Result<usize, Error> {
+        debug!("{}", sql);
+        let count = database::sync::Database::execute(sql.to_owned())?;
+        Ok(count)
+    }
+
+    pub fn version(&self) -> &str {
+        env!("CARGO_PKG_VERSION")
+    }
+
+    pub fn execute_params(&mut self, sql: &str, params: Vec<String>) -> Result<usize, Error> {
+        debug!("{}", sql);
+        let count = database::sync::Database::execute_params(sql.to_owned(), params)?;
+        Ok(count)
     }
 }
 
+impl<'de> Deserialize<'de> for &mut Context {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ContextVisitor<'a>(PhantomData<&'a ()>);
+
+        impl<'a> Visitor<'_> for ContextVisitor<'a> {
+            type Value = &'a mut Context;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("&mut Context")
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+                Ok(Box::leak(Box::new(Context)))
+            }
+        }
+        deserializer.deserialize_unit(ContextVisitor(PhantomData))
+    }
+}
+
+impl<'de> Deserialize<'de> for &Context {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ContextVisitor<'a>(PhantomData<&'a ()>);
+
+        impl<'a> Visitor<'_> for ContextVisitor<'a> {
+            type Value = &'a Context;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("&Context")
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+                Ok(&Context)
+            }
+        }
+        deserializer.deserialize_unit(ContextVisitor(PhantomData))
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct Context;
-
-#[cfg(not(target_arch = "wasm32"))]
-impl Context {
-    pub fn acquire() -> &'static mut Self {
-        Box::leak(Box::new(Context))
-    }
-}
 
 impl Serialize for &Context {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -254,46 +317,9 @@ impl Serialize for &mut Context {
     }
 }
 
-impl<'de, 'a> Deserialize<'de> for &'a mut Context {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ContextVisitor<'a>(PhantomData<&'a ()>);
-
-        impl<'de, 'a> Visitor<'de> for ContextVisitor<'a> {
-            type Value = &'a mut Context;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("&mut Context")
-            }
-
-            fn visit_unit<E>(self) -> Result<Self::Value, E> {
-                Ok(Box::leak(Box::new(Context)))
-            }
-        }
-        deserializer.deserialize_unit(ContextVisitor(PhantomData))
-    }
-}
-
-impl<'de, 'a> Deserialize<'de> for &'a Context {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ContextVisitor<'a>(PhantomData<&'a ()>);
-
-        impl<'de, 'a> Visitor<'de> for ContextVisitor<'a> {
-            type Value = &'a Context;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("&Context")
-            }
-
-            fn visit_unit<E>(self) -> Result<Self::Value, E> {
-                Ok(Box::leak(Box::new(Context)))
-            }
-        }
-        deserializer.deserialize_unit(ContextVisitor(PhantomData))
-    }
+#[macro_export]
+macro_rules! debug {
+    ($($args:tt)*) => {{
+        Context::debug(&format!($($args)*));
+    }};
 }

@@ -8,10 +8,15 @@ edition = "2021"
 async-trait = "0.1.73"
 anyhow = "1"
 futures = "0.3"
-gluesql-core = { version = "0.14.0", default-features = false }
-baildon = { version = "0.1.2" }
+tokio-rusqlite = "0.6.0"
 serde = "1"
 serde_json = { version = "1.0.107", features = ["preserve_order"] }
 tokio = "1"
 sqlparser = "0.30"
+types = { path = "../../core/types" }
+tracing = "0.1"
+# https://sqlite.org/src/file/ext/misc/zipfile.c
 
+[dev-dependencies]
+rusqlite = "*"
+serde_bytes = "0.11"
